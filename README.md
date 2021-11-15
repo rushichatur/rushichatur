@@ -1,0 +1,2 @@
+- 👋 Hi, I’m @rushichatur
+- 🌱 I’m currently learning reactjs
