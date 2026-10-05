@@ -14,6 +14,11 @@ python3 -m http.server 8000      # then open http://localhost:8000
 
 It can also be hosted as-is on GitHub Pages / Netlify. Plans autosave to the browser's local storage.
 
+### Offline single file
+
+`Venuely-offline.html` is the whole app in one file (no server, no internet). Double-click it to open it in a browser.
+Rebuild it after changing the source with `python3 tools/build-offline.py` (needs `esbuild`).
+
 ## Features
 
 - **Templates**: garden wedding, open-air concert, garden party, conference hall, mini festival, or a blank plot.
