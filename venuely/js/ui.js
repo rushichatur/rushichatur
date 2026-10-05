@@ -5,13 +5,17 @@ import { DEFAULT_ARRAY, layoutOf } from './layout.js';
 import { GROUNDS, Camera, Renderer } from './render.js';
 import { thumbCanvas } from './thumbs.js';
 import { resizeFlags } from './editor.js';
-import { round, clamp } from './util.js';
+import { round, clamp, h } from './util.js';
+import { openMapDialog } from './mapui.js';
+import { isActive } from './maps.js';
 import { TEMPLATES } from './templates.js';
 import { Scene } from './scene.js';
 
 // ---- icons -------------------------------------------------------------------
 const I = {
   select: '<path d="M5 3l14 7-6 2.2L10.8 19z"/>',
+  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0114 0C19 14.800 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+  mapmove: '<path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/>',
   hand: '<path d="M8 13V5.5a1.5 1.5 0 013 0V11m0-6.5a1.5 1.5 0 013 0V11m0-4.5a1.5 1.5 0 013 0V15a6 6 0 01-6 6h-.5a6 6 0 01-5-2.7l-3-4.6a1.5 1.5 0 012.4-1.8L8 14"/>',
   poly: '<path d="M4 8l6-4 9 3 1 9-8 4-8-4z"/><circle cx="4" cy="8" r="1.2"/><circle cx="10" cy="4" r="1.2"/><circle cx="19" cy="7" r="1.2"/><circle cx="20" cy="16" r="1.2"/><circle cx="12" cy="20" r="1.2"/><circle cx="4" cy="16" r="1.2"/>',
   road: '<path d="M4 20c0-7 4-6 8-9s2-7 8-7"/><path d="M8 20c2-1 2-3 4-4" stroke-dasharray="2 3"/>',
@@ -55,18 +59,6 @@ const I = {
 };
 export const icon = (n) => `<svg viewBox="0 0 24 24" aria-hidden="true">${I[n] || ''}</svg>`;
 
-function h(tag, attrs = {}, ...kids) {
-  const el = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs || {})) {
-    if (v === false || v == null) continue;
-    if (k === 'class') el.className = v;
-    else if (k === 'html') el.innerHTML = v;
-    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
-    else el.setAttribute(k, v === true ? '' : v);
-  }
-  for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(kid));
-  return el;
-}
 const $ = (s) => document.querySelector(s);
 
 export class UI {
@@ -88,7 +80,7 @@ export class UI {
     editor.on('hint', (t, sticky) => this.hint(t, sticky));
     editor.on('toast', (m) => this.toast(m));
     editor.on('coords', (g) => { $('#coords').textContent = `x ${g[0].toFixed(1)} m · y ${g[1].toFixed(1)} m`; });
-    scene.on((k) => { if (k === 'commit' || k === 'load' || k === 'restore') { this.syncHistory(); this.renderLayers(); this.renderSummary(); if (k !== 'commit') { this.renderProps(); } $('#planName').value = scene.meta.name; } });
+    scene.on((k) => { if (k === 'commit' || k === 'load' || k === 'restore') { this.syncMapUI(); this.syncHistory(); this.renderLayers(); this.renderSummary(); if (k !== 'commit') { this.renderProps(); } $('#planName').value = scene.meta.name; } });
 
     this.renderProps(); this.renderLayers(); this.renderSummary(); this.syncView(); this.syncTools(); this.syncHistory();
     $('#planName').value = scene.meta.name;
@@ -113,7 +105,8 @@ export class UI {
   buildTopbar() {
     const ed = this.ed, sc = this.scene;
     const btn = (ic, title, fn, cls = 'icon-btn') => h('button', { class: cls, title, html: icon(ic), onclick: fn });
-    $('#tbFile').append(h('button', { class: 'btn', html: icon('tpl') + '<span>Templates</span>', onclick: () => this.openModal() }));
+    $('#tbFile').append(h('button', { class: 'btn', html: icon('tpl') + '<span>Templates</span>', onclick: () => this.openModal() }),
+      this.btnMap = h('button', { class: 'btn', title: 'Show a satellite / street map under the layout', html: icon('pin') + '<span>Map</span>', onclick: () => openMapDialog(this) }));
     this.btnUndo = btn('undo', 'Undo (Ctrl+Z)', () => sc.undo());
     this.btnRedo = btn('redo', 'Redo (Ctrl+Shift+Z)', () => sc.redo());
     $('#tbHistory').append(this.btnUndo, this.btnRedo);
@@ -193,6 +186,13 @@ export class UI {
   }
   syncTools() {
     document.querySelectorAll('#toolbar [data-tool]').forEach((b) => b.classList.toggle('on', b.dataset.tool === this.ed.tool));
+    this.syncMapUI();
+  }
+  syncMapUI() {
+    const on = isActive(this.scene.meta.map);
+    if (this.mapTool) this.mapTool.hidden = !on;
+    if (this.btnMap) this.btnMap.classList.toggle('primary-soft', on);
+    if (!on && this.ed.tool === 'map') this.ed.setTool('select');
   }
 
   // ------------------------------------------------------------------ floating toolbars
@@ -200,7 +200,8 @@ export class UI {
     const ed = this.ed;
     const tb = $('#toolbar');
     const t = (ic, tool, title) => h('button', { class: 'icon-btn', 'data-tool': tool, title, html: icon(ic), onclick: () => ed.setTool(tool) });
-    tb.append(t('select', 'select', 'Select / move (V)'), t('hand', 'hand', 'Pan (H or hold Space)'), h('div', { class: 'tb-sep', style: 'width:100%;height:1px;margin:2px 0' }), t('poly', 'polyzone', 'Draw a zone polygon'), t('road', 'path', 'Draw a road / path'));
+    tb.append(t('select', 'select', 'Select / move (V)'), t('hand', 'hand', 'Pan (H or hold Space)'), h('div', { class: 'tb-sep', style: 'width:100%;height:1px;margin:2px 0' }), t('poly', 'polyzone', 'Draw a zone polygon'), t('road', 'path', 'Draw a road / path'),
+      (this.mapTool = h('button', { class: 'icon-btn', 'data-tool': 'map', title: 'Move / rotate the map under the layout', html: icon('mapmove'), onclick: () => ed.setTool('map'), hidden: true })));
     const zb = $('#zoomBox');
     zb.append(
       h('button', { class: 'icon-btn', title: 'Zoom out', html: icon('minus'), onclick: () => ed.zoomBy(1 / 1.25) }),
@@ -388,6 +389,12 @@ export class UI {
       this.row('Depth (m)', this.numInput(() => m.venue.d, (v) => { m.venue.d = v; }, { min: 5, max: 500, step: 1 })),
       this.row('Ground', this.selInput(() => m.ground, (v) => { m.ground = v; }, Object.entries(GROUNDS).map(([k, v]) => [k, v.name]), () => { })));
     root.append(venue);
+    const mp = m.map, mapOn = isActive(mp);
+    root.append(h('div', { class: 'sec' }, h('h4', {}, 'Map background'),
+      h('p', { class: 'hintp', style: 'margin:0 0 10px' }, mapOn ? `${mp.place || 'Map'} is shown under your layout in both views.` : 'Show a satellite or street map under the layout and plan on top of the real site.'),
+      h('div', { class: 'btnrow' },
+        h('button', { class: 'btn', html: icon('pin') + (mapOn ? 'Map settings' : 'Add a map'), onclick: () => openMapDialog(this) }),
+        mapOn ? h('button', { class: 'btn', html: icon('mapmove') + 'Move map', onclick: () => this.ed.setTool('map') }) : null)));
     const view = h('div', { class: 'sec' }, h('h4', {}, 'Display'),
       this.row('Show grid', this.switchInput(() => m.grid, (v) => { m.grid = v; }, () => this.syncView())),
       this.row('Snap to grid', this.selInput(() => String(m.snap), (v) => { m.snap = parseFloat(v); }, [['0', 'Off'], ['0.1', '0.1 m'], ['0.25', '0.25 m'], ['0.5', '0.5 m'], ['1', '1 m']], () => this.syncView())),

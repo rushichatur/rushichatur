@@ -6,6 +6,7 @@ import { Camera, Renderer, boxOf, boxCorners, hullOf, roundRect } from './render
 import { layoutOf, elementSize, gridExtent } from './layout.js';
 import { pointInPoly, distToSeg, rot2, snapTo, DEG, clamp, uid } from './util.js';
 import { PALETTE } from './assets.js';
+import { onMapImage, isActive } from './maps.js';
 
 const ACCENT = '#4f46e5';
 const HANDLES = { nw: [-1, -1], n: [0, -1], ne: [1, -1], e: [1, 0], se: [1, 1], s: [0, 1], sw: [-1, 1], w: [-1, 0] };
@@ -36,6 +37,7 @@ export class Editor {
     this.dpr = 1;
     this.W = 0; this.H = 0;
     this._bind();
+    onMapImage(() => { this.invalidate(); this.emit('mapstatus'); });
     scene.on((k) => {
       if (k === 'load' || k === 'restore') this.pruneSelection();
       this.invalidate();
@@ -127,9 +129,10 @@ export class Editor {
     this.tool = t;
     this.drawing = null;
     if (t === 'polyzone' || t === 'path') this.drawing = { kind: t, pts: [], cursor: null };
-    this.cv.style.cursor = t === 'hand' ? 'grab' : t === 'select' ? 'default' : 'crosshair';
+    this.cv.style.cursor = t === 'hand' ? 'grab' : t === 'select' ? 'default' : t === 'map' ? 'move' : 'crosshair';
     this.hint(t === 'polyzone' ? 'Click to add corners · double-click or Enter to close · Esc to cancel'
-      : t === 'path' ? 'Click to add road points · double-click or Enter to finish · Esc to cancel' : '', true);
+      : t === 'path' ? 'Click to add road points · double-click or Enter to finish · Esc to cancel'
+      : t === 'map' ? 'Drag to slide the map under your layout · Shift+drag to rotate it · Esc to finish' : '', true);
     this.emit('tool');
     this.invalidate();
   }
@@ -371,6 +374,14 @@ export class Editor {
 
     const g = this.cam.unproject(sx, sy);
 
+    if (this.tool === 'map') {
+      const m = this.scene.meta.map;
+      if (!isActive(m)) { this.toast('Choose a map location first'); return; }
+      const v = this.scene.meta.venue, c = [v.w / 2 + m.ox, v.d / 2 + m.oy];
+      this.drag = { type: 'mapmove', g0: g, ox: m.ox, oy: m.oy, rot: m.rot, rotate: e.shiftKey, a0: Math.atan2(g[1] - c[1], g[0] - c[0]) / DEG, moved: false };
+      return;
+    }
+
     if (this.drawing) { this.drawClick(g, e); return; }
 
     const h = this.hitHandle(sx, sy);
@@ -420,6 +431,17 @@ export class Editor {
     if (d) {
       if (d.type === 'pan') { this.cam.px = d.px + (sx - d.sx); this.cam.py = d.py + (sy - d.sy); this.invalidate(); return; }
       if (d.type === 'marquee') { d.x = sx; d.y = sy; this.invalidate(); return; }
+      if (d.type === 'mapmove') {
+        const m = this.scene.meta.map, v = this.scene.meta.venue;
+        if (d.rotate) {
+          const c = [v.w / 2 + m.ox, v.d / 2 + m.oy];
+          let r = d.rot + (Math.atan2(g[1] - c[1], g[0] - c[0]) / DEG - d.a0);
+          m.rot = Math.round((((r + 540) % 360) - 180) * 10) / 10;
+          this.hint(`Map rotation ${m.rot}°`);
+        } else { m.ox = Math.round((d.ox + g[0] - d.g0[0]) * 100) / 100; m.oy = Math.round((d.oy + g[1] - d.g0[1]) * 100) / 100; }
+        d.moved = true; this.invalidate(); this.emit('mapchange');
+        return;
+      }
       if (d.type === 'move') return this.dragMove(d, g, e);
       if (d.type === 'resize') return this.dragResize(d, g, e);
       if (d.type === 'rotate') return this.dragRotate(d, g, e);
@@ -464,7 +486,7 @@ export class Editor {
       this.invalidate();
       return;
     }
-    if (d.moved) { this.scene.commit(); this.emit('live'); }
+    if (d.moved) { this.scene.commit(); this.emit('live'); if (d.type === 'mapmove') this.emit('mapchange'); }
   }
 
   dragMove(d, g, e) {

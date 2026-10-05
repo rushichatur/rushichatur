@@ -6,6 +6,7 @@ import { ASSETS } from './assets.js';
 import { Painter } from './painter.js';
 import { layoutOf } from './layout.js';
 import { DEG, clamp, shade, rot2, hull, luminance } from './util.js';
+import { planMap, imageFor, isActive, attributionFor } from './maps.js';
 
 const C30 = Math.cos(Math.PI / 6), S30 = 0.5;
 
@@ -262,8 +263,11 @@ export class Renderer {
     this.cam = cam;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
 
-    // venue slab
-    if (opt.venue !== false) {
+    const mapOn = opt.venue !== false && isActive(scene.meta.map);
+    if (mapOn) this.drawMap(scene, cam, theme);
+
+    // venue slab (replaced by the map when one is shown)
+    if (opt.venue !== false && !mapOn) {
       const v = scene.meta.venue;
       const slab = { k: 's', b: [[0, 0], [v.w, 0], [v.w, v.d], [0, v.d]], t: [[0, 0], [v.w, 0], [v.w, v.d], [0, v.d]], z: -0.7, h: 0.7, c: theme.side, tc: theme.top };
       const out = [];
@@ -271,6 +275,7 @@ export class Renderer {
       for (const c of out) this.drawCmd(c, theme.grid[0] ? '#ffffff' : '#000000');
       if (opt.grid !== false) this.drawGrid(scene, cam, theme);
     }
+    if (mapOn && opt.grid !== false) this.drawGrid(scene, cam, { ...theme, grid: [255, 0.16] });
 
     const { ground, items, tags } = this.collect(scene.objects, cam, { W, H });
     this.stats.prims = ground.length + items.length;
@@ -283,6 +288,54 @@ export class Renderer {
 
     if (opt.after) opt.after(ctx, cam, W, H);
     if (opt.scaleBar) this.drawScaleBar(cam, W, H, theme);
+    if (mapOn) this.drawAttribution(scene.meta.map, W, H);
+  }
+
+  /** Map imagery laid flat on the ground plane, plus the venue outline. */
+  drawMap(scene, cam, theme) {
+    const ctx = this.ctx, map = scene.meta.map, v = scene.meta.venue;
+    const plan = planMap(map, v);
+    if (!plan) return;
+    const m = cam.basis(0);
+    const cx = v.w / 2 + map.ox, cy = v.d / 2 + map.oy;
+    ctx.save();
+    ctx.globalAlpha = clamp(map.opacity, 0, 1);
+    ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
+    ctx.translate(cx, cy);
+    ctx.rotate(map.rot * DEG);
+    ctx.imageSmoothingQuality = 'high';
+    for (const it of plan.items) {
+      const e = imageFor(it.url);
+      if (e.state === 'ok') {
+        const ov = it.w / 256 * 0.35; // hide hairline seams between neighbouring tiles
+        ctx.drawImage(e.img, it.x0 - ov / 2, it.y0 - ov / 2, it.w + ov, it.h + ov);
+      } else if (e.state === 'loading') {
+        ctx.fillStyle = 'rgba(120,130,150,.12)'; ctx.fillRect(it.x0, it.y0, it.w, it.h);
+      }
+    }
+    ctx.restore();
+    // venue outline so the editable area stays visible on top of busy imagery
+    ctx.save();
+    ctx.lineJoin = 'round';
+    const pts = [[0, 0], [v.w, 0], [v.w, v.d], [0, v.d]].map(([x, y]) => cam.project(x, y, 0));
+    ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath();
+    ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = 4; ctx.stroke();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.setLineDash([9, 6]); ctx.stroke();
+    ctx.restore();
+  }
+
+  drawAttribution(map, W, H) {
+    const t = attributionFor(map);
+    if (!t) return;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.font = '500 10.5px Inter, system-ui, sans-serif';
+    const w = ctx.measureText(t).width + 14;
+    ctx.fillStyle = 'rgba(255,255,255,.82)';
+    ctx.beginPath(); roundRect(ctx, W / 2 - w / 2, H - 22, w, 17, 6); ctx.fill();
+    ctx.fillStyle = '#334155'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(t, W / 2, H - 13);
+    ctx.restore();
   }
 
   drawCmd(c) {

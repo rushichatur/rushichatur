@@ -33,6 +33,10 @@ Rebuild it after changing the source with `python3 tools/build-offline.py` (need
 - **Zones, roads & labels**: rectangle or free-polygon zones with names, drawn roads/paths (asphalt, paver, carpet, sand …), flow arrows, text labels.
 - **Views**: 2D plan ↔ isometric, rotate the isometric view in 90° steps, outline or soft drawing style, several ground themes.
 - **Editing**: select / multi-select, move, rotate, snap, align & distribute, duplicate, copy / paste, layers panel (lock / hide), undo / redo.
+- **Map background**: show a real map under the layout (2D and isometric) and plan on top of the actual site.
+  Sources: **Google Maps** (your own API key with the *Maps Static API* enabled), **Esri satellite** and **OpenStreetMap** (free, no key).
+  Search an address or paste `lat, lng`, then rotate / slide the map or drag it on the canvas. 1 m on the plan = 1 m on the map.
+  The Google key is stored only in your browser (never in saved plans). Map images need internet access.
 - **Summary tab**: bill of quantities plus total seat count.
 - **Export**: PNG, print / PDF, save & open `.json` plans.
 
@@ -53,5 +57,6 @@ Rebuild it after changing the source with `python3 tools/build-offline.py` (need
 | `js/editor.js` | Selection, handles, drawing tools, keyboard & pointer input |
 | `js/ui.js` | Panels, properties form, menus, template picker |
 | `js/templates.js` | Starter layouts |
+| `js/maps.js`, `js/mapui.js` | Map imagery planning / loading and the Map panel |
 
 To add an asset, call `def('my_asset', {...})` in `assets.js` with a `build(o, P)` function and add a preset to `PALETTE`.
