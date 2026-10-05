@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Venuely – Event Layout Studio</title>
+  <meta name="description" content="Design event layouts in flat 2D or isometric view: stages, truss, tents, seating arrays, zones and roads.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M16 6l9 5v10l-9 5-9-5V11z' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M7 11l9 5 9-5M16 16v10' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand" title="Venuely">
+      <svg viewBox="0 0 32 32" width="26" height="26"><rect width="32" height="32" rx="8" fill="#4f46e5"/><path d="M16 6l9 5v10l-9 5-9-5V11z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M7 11l9 5 9-5M16 16v10" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>
+      <span>Venuely</span>
+    </div>
+    <input id="planName" class="plan-name" spellcheck="false" aria-label="Plan name">
+    <div class="tb-group" id="tbFile"></div>
+    <div class="tb-sep"></div>
+    <div class="tb-group" id="tbHistory"></div>
+    <div class="tb-sep"></div>
+    <div class="seg" id="viewSeg" role="tablist" aria-label="View mode">
+      <button data-mode="2d" title="Flat 2D plan (2)">2D plan</button>
+      <button data-mode="iso" title="Isometric 3D view (3)">Isometric</button>
+    </div>
+    <div class="tb-group" id="tbView"></div>
+    <div class="grow"></div>
+    <div class="tb-group" id="tbExport"></div>
+    <button class="icon-btn only-narrow" id="btnLeft" title="Library"></button>
+    <button class="icon-btn only-narrow" id="btnRight" title="Properties"></button>
+  </header>
+
+  <div id="app">
+    <aside id="left" class="panel">
+      <div class="tabs" id="leftTabs">
+        <button data-tab="assets" class="on">Library</button>
+        <button data-tab="layers">Layers</button>
+        <button data-tab="summary">Summary</button>
+      </div>
+      <div class="tabpane on" id="paneAssets">
+        <div class="search"><input id="assetSearch" placeholder="Search chairs, truss, tents…" spellcheck="false"></div>
+        <div id="assetList"></div>
+      </div>
+      <div class="tabpane" id="paneLayers"></div>
+      <div class="tabpane" id="paneSummary"></div>
+    </aside>
+
+    <main id="stage">
+      <canvas id="cv" tabindex="0"></canvas>
+      <div id="toolbar" class="floating"></div>
+      <div id="hint" class="hint"></div>
+      <div id="zoomBox" class="floating zoombox"></div>
+      <div id="coords" class="coords"></div>
+      <div id="dropMask" class="drop-mask">Drop to place</div>
+    </main>
+
+    <aside id="right" class="panel">
+      <div id="props"></div>
+    </aside>
+  </div>
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h2>Start a layout</h2>
+          <p>Pick a template to customise, or start from a blank plot.</p>
+        </div>
+        <button class="icon-btn" id="modalClose" title="Close">✕</button>
+      </div>
+      <div id="tplGrid" class="tpl-grid"></div>
+    </div>
+  </div>
+  <div id="toast" class="toast"></div>
+  <input type="file" id="fileOpen" accept=".json,application/json" hidden>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
