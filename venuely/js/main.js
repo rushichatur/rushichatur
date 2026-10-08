@@ -19,7 +19,7 @@ if (tpl) {
   ui.openModal();
 }
 
-if (params.get('mode') === '2d') editor.setMode('2d');
+if (params.get('mode') === 'iso') editor.setMode('iso');
 if (params.get('yaw')) { editor.cam.yaw = +params.get('yaw'); editor.fitView(); }
 if (params.get('style')) { scene.meta.style = params.get('style'); ui.syncView(); }
 editor.invalidate();

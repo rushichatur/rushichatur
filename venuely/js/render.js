@@ -287,8 +287,8 @@ export class Renderer {
     if (opt.tags !== false) for (const o of tags) this.drawTag(o, cam);
 
     if (opt.after) opt.after(ctx, cam, W, H);
-    if (opt.scaleBar) this.drawScaleBar(cam, W, H, theme);
-    if (mapOn) this.drawAttribution(scene.meta.map, W, H);
+    if (opt.scaleBar) this.drawScaleBar(cam, W, H, theme, opt.scaleBarX);
+    if (mapOn && opt.attrib !== false) this.drawAttribution(scene.meta.map, W, H, opt.attribY);
   }
 
   /** Map imagery laid flat on the ground plane, plus the venue outline. */
@@ -324,7 +324,8 @@ export class Renderer {
     ctx.restore();
   }
 
-  drawAttribution(map, W, H) {
+  drawAttribution(map, W, H, y) {
+    const yy = y == null ? H - 22 : y;
     const t = attributionFor(map);
     if (!t) return;
     const ctx = this.ctx;
@@ -332,9 +333,9 @@ export class Renderer {
     ctx.font = '500 10.5px Inter, system-ui, sans-serif';
     const w = ctx.measureText(t).width + 14;
     ctx.fillStyle = 'rgba(255,255,255,.82)';
-    ctx.beginPath(); roundRect(ctx, W / 2 - w / 2, H - 22, w, 17, 6); ctx.fill();
+    ctx.beginPath(); roundRect(ctx, W / 2 - w / 2, yy, w, 17, 6); ctx.fill();
     ctx.fillStyle = '#334155'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(t, W / 2, H - 13);
+    ctx.fillText(t, W / 2, yy + 9);
     ctx.restore();
   }
 
@@ -445,11 +446,11 @@ export class Renderer {
     o._tag = { x, y, w, h: h + 7 };
   }
 
-  drawScaleBar(cam, W, H, theme) {
+  drawScaleBar(cam, W, H, theme, x0 = 18) {
     const ctx = this.ctx;
     const nice = [1, 2, 5, 10, 20, 50, 100];
     let m = nice.find((n) => n * cam.zoom >= 70) || 100;
-    const len = m * cam.zoom, x = 18, y = H - 18;
+    const len = m * cam.zoom, x = x0, y = H - 22;
     ctx.save();
     ctx.strokeStyle = theme.ink === '#1f2937' ? '#1f2937' : '#e7ebf2';
     ctx.fillStyle = ctx.strokeStyle;

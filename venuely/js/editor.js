@@ -23,6 +23,8 @@ export class Editor {
     this.scene = scene;
     this.renderer = new Renderer(canvas);
     this.cam = new Camera();
+    this.cam.mode = '2d';
+    this.insets = { l: 76, r: 0, t: 0, b: 0 };
     this.sel = new Set();
     this.tool = 'select';
     this.drawing = null;
@@ -66,9 +68,10 @@ export class Editor {
   }
   draw() {
     this.renderer.draw(this.scene, this.cam, {
-      style: this.scene.meta.style, grid: this.scene.meta.grid, scaleBar: true, dpr: this.dpr,
+      style: this.scene.meta.style, grid: this.scene.meta.grid, scaleBar: true, scaleBarX: this.insets.l + 8, attribY: this.H - 78, dpr: this.dpr,
       after: (ctx) => this.drawOverlay(ctx),
     });
+    this.emit('drawn');
   }
 
   // ---- selection ---------------------------------------------------------------
@@ -90,7 +93,9 @@ export class Editor {
     return [[0, 0, 0], [v.w, 0, 0], [v.w, v.d, 0], [0, v.d, 0], [0, 0, 5], [v.w, v.d, 5], [v.w, 0, 5], [0, v.d, 5]];
   }
   fitView() {
-    this.cam.fit(this.venuePoints(), this.W, this.H, 70);
+    const i = this.insets, w = Math.max(200, this.W - i.l - i.r), hh = Math.max(200, this.H - i.t - i.b - 90);
+    this.cam.fit(this.venuePoints(), w, hh, 40);
+    this.cam.px += i.l; this.cam.py += i.t + 40;
     this.emit('view'); this.invalidate();
   }
   setMode(mode) {
@@ -101,7 +106,7 @@ export class Editor {
     this.emit('view');
   }
   rotateView(step) {
-    if (this.cam.mode !== 'iso') { this.setMode('iso'); return; }
+    if (this.cam.mode !== 'iso') { this.cam.yaw = (this.cam.yaw + step + 360) % 360; this.emit('view'); this.invalidate(); return; }
     const c = this.cam.unproject(this.W / 2, this.H / 2);
     this.cam.yaw = (this.cam.yaw + step + 360) % 360;
     this.recentre(c);
@@ -299,6 +304,7 @@ export class Editor {
   }
 
   handleList(o) {
+    this._handleObj = o;
     const a = ASSETS[o.type];
     if (a.world || o.locked) return [];
     const b = boxOf(o);
@@ -321,7 +327,13 @@ export class Editor {
   }
   handleScreen(h) {
     const p = this.cam.project(h.wx, h.wy, 0);
-    return h.rot ? [p[0], p[1] - 30] : p;
+    if (!h.rot) return p;
+    // push the rotate handle outward from the item's centre so it never lands on the item itself
+    const o = this._handleObj, c = o ? this.cam.project(boxOf(o).cx, boxOf(o).cy, 0) : [p[0], p[1] + 1];
+    let dx = p[0] - c[0], dy = p[1] - c[1];
+    const l = Math.hypot(dx, dy);
+    if (l < 1e-3) { dx = 0; dy = -1; } else { dx /= l; dy /= l; }
+    return [p[0] + dx * 28, p[1] + dy * 28];
   }
   hitHandle(sx, sy) {
     if (this.sel.size !== 1) return null;

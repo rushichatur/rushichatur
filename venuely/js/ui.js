@@ -14,6 +14,15 @@ import { Scene } from './scene.js';
 // ---- icons -------------------------------------------------------------------
 const I = {
   select: '<path d="M5 3l14 7-6 2.2L10.8 19z"/>',
+  cube: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.500a2.500 2.500 0 114 2c-.9.6-1.500 1-1.500 2M12 17h.01"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.400 15a1.700 1.700 0 00.3 1.800l.1.1a2 2 0 11-2.800 2.800l-.1-.1a1.700 1.700 0 00-1.800-.3 1.700 1.700 0 00-1 1.500V21a2 2 0 11-4 0v-.1a1.700 1.700 0 00-1.100-1.500 1.700 1.700 0 00-1.800.3l-.1.1a2 2 0 11-2.800-2.800l.1-.1a1.700 1.700 0 00.3-1.800 1.700 1.700 0 00-1.500-1H3a2 2 0 110-4h.1a1.700 1.700 0 001.500-1.100 1.700 1.700 0 00-.3-1.800l-.1-.1a2 2 0 112.800-2.800l.1.1a1.700 1.700 0 001.800.3H9a1.700 1.700 0 001-1.500V3a2 2 0 114 0v.1a1.700 1.700 0 001 1.500 1.700 1.700 0 001.800-.3l.1-.1a2 2 0 112.800 2.800l-.1.1a1.700 1.700 0 00-.3 1.800V9a1.700 1.700 0 001.500 1H21a2 2 0 110 4h-.1a1.700 1.700 0 00-1.500 1z"/>',
+  share: '<path d="M12 15V3M8 7l4-4 4 4M5 13v6a2 2 0 002 2h10a2 2 0 002-2v-6"/>',
+  users: '<circle cx="9" cy="8" r="3.500"/><path d="M2.500 20a6.500 6.500 0 0113 0M16 5a3.500 3.500 0 010 7M18 14a6.500 6.500 0 013.500 6"/>',
+  swap: '<path d="M7 7h11l-3-3M17 17H6l3 3"/>',
+  text: '<path d="M5 6V5h14v1M12 5v14M9 19h6"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
   pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0114 0C19 14.800 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
   mapmove: '<path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/>',
   hand: '<path d="M8 13V5.5a1.5 1.5 0 013 0V11m0-6.5a1.5 1.5 0 013 0V11m0-4.5a1.5 1.5 0 013 0V15a6 6 0 01-6 6h-.5a6 6 0 01-5-2.7l-3-4.6a1.5 1.5 0 012.4-1.8L8 14"/>',
@@ -65,27 +74,43 @@ export class UI {
   constructor(editor, scene) {
     this.ed = editor; this.scene = scene;
     this.syncers = [];
-    this.buildTopbar();
+    this.showPlan = false;
+    this.leftTab = 'assets';
+    this.buildRail();
+    this.buildChrome();
     this.buildToolbar();
+    this.buildMini();
     this.buildLibrary();
-    this.buildTabs();
     this.buildDnD();
     this.buildModal();
 
-    editor.on('selection', () => { this.renderProps(); this.renderLayers(); });
+    editor.on('selection', () => { if (editor.sel.size) this.showPlan = false; this.renderProps(); this.renderLayers(); });
     editor.on('objects', () => { this.renderLayers(); this.renderSummary(); this.renderProps(); });
     editor.on('live', () => this.sync());
-    editor.on('view', () => this.syncView());
+    editor.on('view', () => { this.syncView(); this.drawMini(true); });
+    editor.on('drawn', () => this.drawMini());
     editor.on('tool', () => this.syncTools());
     editor.on('hint', (t, sticky) => this.hint(t, sticky));
     editor.on('toast', (m) => this.toast(m));
-    editor.on('coords', (g) => { $('#coords').textContent = `x ${g[0].toFixed(1)} m · y ${g[1].toFixed(1)} m`; });
-    scene.on((k) => { if (k === 'commit' || k === 'load' || k === 'restore') { this.syncMapUI(); this.syncHistory(); this.renderLayers(); this.renderSummary(); if (k !== 'commit') { this.renderProps(); } $('#planName').value = scene.meta.name; } });
+    editor.on('coords', (g) => { $('#coords').textContent = `${g[0].toFixed(1)} m, ${g[1].toFixed(1)} m`; });
+    scene.on((k) => {
+      if (k === 'commit' || k === 'load' || k === 'restore') {
+        this.syncMapUI(); this.syncHistory(); this.renderLayers(); this.renderSummary();
+        if (k !== 'commit') this.renderProps();
+        $('#planName').value = scene.meta.name;
+        this.flashSaved();
+      }
+    });
 
+    const open = window.innerWidth >= 900;
+    this.setLeft('assets', true, open);
     this.renderProps(); this.renderLayers(); this.renderSummary(); this.syncView(); this.syncTools(); this.syncHistory();
     $('#planName').value = scene.meta.name;
     $('#planName').addEventListener('input', (e) => { scene.meta.name = e.target.value; });
     $('#planName').addEventListener('change', () => scene.commit());
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); this.setLeft('assets', true, true); $('#assetSearch').focus(); $('#assetSearch').select(); }
+    });
   }
 
   // ------------------------------------------------------------------ hint / toast
@@ -100,88 +125,168 @@ export class UI {
     const t = $('#toast'); t.textContent = m; t.classList.add('show');
     clearTimeout(this._tt); this._tt = setTimeout(() => t.classList.remove('show'), 2200);
   }
+  flashSaved() {
+    const s = $('#saved'); if (!s) return;
+    s.textContent = 'Saved'; s.style.color = '';
+  }
 
-  // ------------------------------------------------------------------ top bar
-  buildTopbar() {
-    const ed = this.ed, sc = this.scene;
-    const btn = (ic, title, fn, cls = 'icon-btn') => h('button', { class: cls, title, html: icon(ic), onclick: fn });
-    $('#tbFile').append(h('button', { class: 'btn', html: icon('tpl') + '<span>Templates</span>', onclick: () => this.openModal() }),
-      this.btnMap = h('button', { class: 'btn', title: 'Show a satellite / street map under the layout', html: icon('pin') + '<span>Map</span>', onclick: () => openMapDialog(this) }));
-    this.btnUndo = btn('undo', 'Undo (Ctrl+Z)', () => sc.undo());
-    this.btnRedo = btn('redo', 'Redo (Ctrl+Shift+Z)', () => sc.redo());
-    $('#tbHistory').append(this.btnUndo, this.btnRedo);
+  // ------------------------------------------------------------------ left rail + panel
+  buildRail() {
+    const rail = $('#rail');
+    const mk = (ic, tip, fn, key) => h('button', { class: 'icon-btn', 'data-tip': tip, 'data-rail': key, 'aria-label': tip, html: icon(ic), onclick: fn });
+    this.railMap = mk('pin', 'Map background', () => openMapDialog(this), 'map');
+    rail.append(
+      mk('cube', 'Library', () => this.setLeft('assets'), 'assets'),
+      mk('front', 'Layers', () => this.setLeft('layers'), 'layers'),
+      mk('list', 'Summary & seat count', () => this.setLeft('summary'), 'summary'),
+      h('div', { class: 'sep' }),
+      mk('tpl', 'Templates', () => this.openModal(), 'tpl'),
+      this.railMap,
+      h('div', { class: 'grow' }),
+      mk('help', 'Help & shortcuts', (e) => this.helpMenu(e.currentTarget), 'help'));
+    $('#leftClose').innerHTML = icon('close');
+    $('#leftClose').onclick = () => this.setLeft(this.leftTab, false, false);
+  }
 
-    $('#viewSeg').addEventListener('click', (e) => { const m = e.target.dataset.mode; if (m) ed.setMode(m); });
-    this.btnRotL = btn('rotL', 'Rotate view left (Q)', () => ed.rotateView(-90));
-    this.btnRotR = btn('rotR', 'Rotate view right (E)', () => ed.rotateView(90));
-    this.btnGrid = btn('grid', 'Toggle grid (G)', () => { sc.meta.grid = !sc.meta.grid; sc.commit(); ed.invalidate(); this.syncView(); });
-    this.btnSnap = btn('magnet', 'Snap to grid', () => { sc.meta.snap = sc.meta.snap ? 0 : 0.5; sc.commit(); this.syncView(); this.renderProps(); });
-    this.btnStyle = btn('style', 'Toggle outline / soft drawing style', () => { sc.meta.style = sc.meta.style === 'outline' ? 'soft' : 'outline'; sc.commit(); ed.invalidate(); this.syncView(); this.renderProps(); });
-    $('#tbView').append(this.btnRotL, this.btnRotR, this.btnGrid, this.btnSnap, this.btnStyle);
+  /** Show / hide the left panel and switch its tab. */
+  setLeft(tab, force = false, openState = null) {
+    const left = $('#left');
+    const wasOpen = !left.classList.contains('closed');
+    let open;
+    if (openState !== null) open = openState;
+    else open = force ? true : !(wasOpen && this.leftTab === tab);
+    this.leftTab = tab;
+    left.classList.toggle('closed', !open);
+    $('#leftTitle').textContent = { assets: 'Library', layers: 'Layers', summary: 'Summary' }[tab];
+    document.querySelectorAll('.tabpane').forEach((p) => p.classList.toggle('on', p.id === 'pane' + tab[0].toUpperCase() + tab.slice(1)));
+    document.querySelectorAll('#rail [data-rail]').forEach((b) => b.classList.toggle('on', open && b.dataset.rail === tab));
+    if (tab === 'summary') this.renderSummary();
+    if (tab === 'layers') this.renderLayers();
+    const narrow = window.innerWidth <= 820;
+    this.ed.insets.l = narrow ? 64 : open ? 388 : 76;
+    this.ed.invalidate();
+    this.drawMini(true);
+  }
 
-    const expBtn = h('button', { class: 'btn primary', html: icon('download') + '<span>Export</span>', onclick: (e) => this.exportMenu(e.currentTarget) });
-    $('#tbExport').append(expBtn);
-
-    $('#btnLeft').innerHTML = icon('panelL'); $('#btnRight').innerHTML = icon('panelR');
-    $('#btnLeft').onclick = () => { $('#left').classList.toggle('open'); $('#right').classList.remove('open'); };
-    $('#btnRight').onclick = () => { $('#right').classList.toggle('open'); $('#left').classList.remove('open'); };
-
-    document.addEventListener('pointerdown', (e) => { if (this.menu && !this.menu.contains(e.target) && !e.target.closest('.btn.primary')) this.closeMenu(); });
+  // ------------------------------------------------------------------ top chip, share, menus
+  buildChrome() {
+    const ed = this.ed;
+    $('#btnSettings').innerHTML = icon('gear');
+    $('#btnSettings').dataset.tip = 'Plan settings';
+    $('#btnSettings').onclick = () => { this.showPlan = !this.showPlan; if (this.showPlan) ed.setSelection([]); this.renderProps(); };
+    const share = $('#btnShare');
+    share.innerHTML = icon('share') + '<span>Share</span>';
+    share.onclick = (e) => this.shareMenu(e.currentTarget);
+    document.addEventListener('pointerdown', (e) => { if (this.menu && !this.menu.contains(e.target) && !e.target.closest('#btnShare, [data-rail=help]')) this.closeMenu(); });
   }
 
   closeMenu() { if (this.menu) { this.menu.remove(); this.menu = null; } }
-  exportMenu(anchor) {
+  openMenu(anchor, items, place) {
     if (this.menu) { this.closeMenu(); return; }
+    const m = h('div', { class: 'menu' }, items);
     const r = anchor.getBoundingClientRect();
-    const item = (ic, label, fn) => h('button', { html: icon(ic) + `<span>${label}</span>`, onclick: () => { this.closeMenu(); fn(); } });
-    const m = h('div', { class: 'menu' },
-      item('image', 'Download PNG image', () => this.exportPNG()),
-      item('print', 'Print / save as PDF', () => this.exportPrint()),
-      h('hr'),
-      item('file', 'Save plan (.json)', () => this.exportJSON()),
-      item('upload', 'Open plan (.json)', () => $('#fileOpen').click()),
-    );
-    m.style.top = r.bottom + 6 + 'px'; m.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
     document.body.append(m);
+    place(m, r);
     this.menu = m;
   }
+  shareMenu(anchor) {
+    const item = (ic, label, fn, sub, dis) => h('button', { html: icon(ic) + `<span>${label}${sub ? `<small>${sub}</small>` : ''}</span>`, disabled: dis, onclick: () => { this.closeMenu(); fn(); } });
+    this.openMenu(anchor, [
+      item('image', 'Download image (PNG)', () => this.exportPNG()),
+      item('print', 'Print / save as PDF', () => this.exportPrint()),
+      h('hr'),
+      item('file', 'Save plan file (.json)', () => this.exportJSON()),
+      item('upload', 'Open plan file', () => $('#fileOpen').click()),
+      h('hr'),
+      item('users', 'Invite people', () => { }, 'Live teamwork is coming soon', true),
+    ], (m, r) => { m.style.top = r.bottom + 8 + 'px'; m.style.right = Math.max(8, window.innerWidth - r.right) + 'px'; });
+  }
+  helpMenu(anchor) {
+    this.openMenu(anchor, [
+      h('h5', {}, 'Quick tips'),
+      h('div', { class: 'shortcuts' },
+        h('span', { class: 'kbd' }, 'Click preview'), 'Switch plan / isometric',
+        h('span', { class: 'kbd' }, '2 / 3'), 'Plan / isometric view',
+        h('span', { class: 'kbd' }, 'Q / E'), 'Rotate isometric view',
+        h('span', { class: 'kbd' }, 'Ctrl+K'), 'Search the library',
+        h('span', { class: 'kbd' }, 'Space+drag'), 'Pan (or middle mouse)',
+        h('span', { class: 'kbd' }, 'Scroll'), 'Zoom to cursor',
+        h('span', { class: 'kbd' }, 'R'), 'Rotate selection',
+        h('span', { class: 'kbd' }, 'Ctrl+D'), 'Duplicate',
+        h('span', { class: 'kbd' }, 'Arrows'), 'Nudge (Shift = 1 m)',
+        h('span', { class: 'kbd' }, 'Del'), 'Delete'),
+      h('p', { class: 'hintp', style: 'margin:6px 10px 8px' }, 'Drag the edge handles of a chair block to add rows and columns.'),
+    ], (m, r) => { m.style.left = r.right + 12 + 'px'; m.style.bottom = Math.max(8, window.innerHeight - r.bottom) + 'px'; m.style.width = '300px'; });
+  }
+
   fileName(ext) { return (this.scene.meta.name || 'plan').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() + '.' + ext; }
   download(blob, name) {
     const a = h('a', { href: URL.createObjectURL(blob), download: name });
     document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
   exportPNG() {
-    const cv = this.ed.renderToCanvas(2600);
-    cv.toBlob((b) => { this.download(b, this.fileName('png')); this.toast('PNG exported'); }, 'image/png');
+    try {
+      const cv = this.ed.renderToCanvas(2600);
+      cv.toBlob((b) => { if (!b) { this.toast('Could not create the image'); return; } this.download(b, this.fileName('png')); this.toast('Image downloaded'); }, 'image/png');
+    } catch (e) { this.toast('The map blocks image export in this browser. Turn the map off to export.'); }
   }
   exportPrint() {
-    const cv = this.ed.renderToCanvas(2000);
+    let url;
+    try { url = this.ed.renderToCanvas(2000).toDataURL('image/png'); } catch (e) { this.toast('The map blocks printing in this browser. Turn the map off to print.'); return; }
     const w = window.open('', '_blank');
     if (!w) { this.toast('Pop-up blocked – allow pop-ups to print'); return; }
-    w.document.write(`<title>${this.scene.meta.name}</title><style>@page{size:landscape;margin:10mm}body{margin:0;font:600 18px Inter,system-ui,sans-serif}img{width:100%}h1{font-size:20px;margin:0 0 8px}</style><h1>${this.scene.meta.name}</h1><img src="${cv.toDataURL('image/png')}" onload="setTimeout(()=>print(),200)">`);
+    w.document.write(`<title>${this.scene.meta.name}</title><style>@page{size:landscape;margin:10mm}body{margin:0;font:600 18px Inter,system-ui,sans-serif}img{width:100%}h1{font-size:20px;margin:0 0 8px}</style><h1>${this.scene.meta.name}</h1><img src="${url}" onload="setTimeout(()=>print(),200)">`);
     w.document.close();
   }
   exportJSON() {
     const blob = new Blob([this.scene.snapshot()], { type: 'application/json' });
     this.download(blob, this.fileName('json'));
-    this.toast('Plan saved');
+    this.toast('Plan file saved');
   }
   importJSON(file) {
     const rd = new FileReader();
     rd.onload = () => {
-      try { this.scene.load(rd.result); this.scene.commit(); this.ed.setSelection([]); this.ed.fitView(); this.toast('Plan loaded'); } catch (e) { this.toast('Could not read that file'); }
+      try { this.scene.load(rd.result); this.scene.commit(); this.ed.setSelection([]); this.ed.fitView(); this.toast('Plan opened'); } catch (e) { this.toast('Could not read that file'); }
     };
     rd.readAsText(file);
+  }
+
+  // ------------------------------------------------------------------ bottom toolbar
+  buildToolbar() {
+    const ed = this.ed, sc = this.scene;
+    const tb = $('#toolbar');
+    const b = (ic, tip, fn, extra = {}) => h('button', { class: 'icon-btn', 'data-tip': tip, 'aria-label': tip, html: icon(ic), onclick: fn, ...extra });
+    const tool = (ic, id, tip) => b(ic, tip, () => ed.setTool(id), { 'data-tool': id });
+    const sep = () => h('div', { class: 'tb-sep' });
+    this.btnUndo = b('undo', 'Undo  Ctrl+Z', () => sc.undo());
+    this.btnRedo = b('redo', 'Redo  Ctrl+Shift+Z', () => sc.redo());
+    this.btnGrid = b('grid', 'Show grid  G', () => { sc.meta.grid = !sc.meta.grid; sc.commit(); ed.invalidate(); this.syncView(); });
+    this.btnSnap = b('magnet', 'Snap to grid', () => { sc.meta.snap = sc.meta.snap ? 0 : 0.5; sc.commit(); this.syncView(); this.renderProps(); });
+    this.btnRotL = b('rotL', 'Rotate view  Q', () => ed.rotateView(-90));
+    this.btnRotR = b('rotR', 'Rotate view  E', () => ed.rotateView(90));
+    this.rotGroup = h('span', { style: 'display:contents' }, sep(), this.btnRotL, this.btnRotR);
+    this.mapTool = b('mapmove', 'Move / rotate the map', () => ed.setTool('map'), { 'data-tool': 'map', hidden: true });
+    tb.append(
+      tool('select', 'select', 'Select  V'), tool('hand', 'hand', 'Pan  H'), sep(),
+      tool('poly', 'polyzone', 'Draw a zone'), tool('road', 'path', 'Draw a road'),
+      b('text', 'Add a text label', () => ed.addPreset('label')), this.mapTool, sep(),
+      this.btnUndo, this.btnRedo, sep(), this.btnGrid, this.btnSnap, this.rotGroup);
+
+    const zb = $('#zoomBox');
+    zb.append(h('span', { class: 'coords', id: 'coords' }),
+      h('button', { class: 'icon-btn', title: 'Zoom out', html: icon('minus'), onclick: () => ed.zoomBy(1 / 1.25) }),
+      h('span', { class: 'zl', id: 'zoomLabel' }, '100%'),
+      h('button', { class: 'icon-btn', title: 'Zoom in', html: icon('plus'), onclick: () => ed.zoomBy(1.25) }),
+      h('button', { class: 'icon-btn', title: 'Fit the whole venue (F frames your selection)', html: icon('fit'), onclick: () => ed.fitView() }));
   }
 
   syncHistory() { this.btnUndo.disabled = !this.scene.canUndo; this.btnRedo.disabled = !this.scene.canRedo; }
   syncView() {
     const ed = this.ed, sc = this.scene;
-    document.querySelectorAll('#viewSeg button').forEach((b) => b.classList.toggle('on', b.dataset.mode === ed.cam.mode));
-    this.btnRotL.disabled = this.btnRotR.disabled = false;
     this.btnGrid.classList.toggle('on', !!sc.meta.grid);
     this.btnSnap.classList.toggle('on', !!sc.meta.snap);
-    this.btnStyle.classList.toggle('on', sc.meta.style === 'soft');
+    this.rotGroup.hidden = false;
+    for (const el of [this.rotGroup]) el.style.display = ed.cam.mode === 'iso' ? 'contents' : 'none';
     const z = $('#zoomLabel'); if (z) z.textContent = Math.round((ed.cam.zoom / 18) * 100) + '%';
   }
   syncTools() {
@@ -191,24 +296,44 @@ export class UI {
   syncMapUI() {
     const on = isActive(this.scene.meta.map);
     if (this.mapTool) this.mapTool.hidden = !on;
-    if (this.btnMap) this.btnMap.classList.toggle('primary-soft', on);
+    if (this.railMap) this.railMap.classList.toggle('on', on);
     if (!on && this.ed.tool === 'map') this.ed.setTool('select');
   }
 
-  // ------------------------------------------------------------------ floating toolbars
-  buildToolbar() {
-    const ed = this.ed;
-    const tb = $('#toolbar');
-    const t = (ic, tool, title) => h('button', { class: 'icon-btn', 'data-tool': tool, title, html: icon(ic), onclick: () => ed.setTool(tool) });
-    tb.append(t('select', 'select', 'Select / move (V)'), t('hand', 'hand', 'Pan (H or hold Space)'), h('div', { class: 'tb-sep', style: 'width:100%;height:1px;margin:2px 0' }), t('poly', 'polyzone', 'Draw a zone polygon'), t('road', 'path', 'Draw a road / path'),
-      (this.mapTool = h('button', { class: 'icon-btn', 'data-tool': 'map', title: 'Move / rotate the map under the layout', html: icon('mapmove'), onclick: () => ed.setTool('map'), hidden: true })));
-    const zb = $('#zoomBox');
-    zb.append(
-      h('button', { class: 'icon-btn', title: 'Zoom out', html: icon('minus'), onclick: () => ed.zoomBy(1 / 1.25) }),
-      h('span', { class: 'zl', id: 'zoomLabel' }, '100%'),
-      h('button', { class: 'icon-btn', title: 'Zoom in', html: icon('plus'), onclick: () => ed.zoomBy(1.25) }),
-      h('button', { class: 'icon-btn', title: 'Fit venue (F frames selection)', html: icon('fit'), onclick: () => ed.fitView() }),
-    );
+  // ------------------------------------------------------------------ view switcher (preview box)
+  buildMini() {
+    const ed = this.ed, mini = $('#mini');
+    this.miniCv = $('#miniCv'); this.miniR = new Renderer(this.miniCv); this.miniCam = new Camera();
+    $('#miniSwap').innerHTML = icon('swap');
+    const rot = h('div', { class: 'mini-rot' },
+      h('button', { class: 'icon-btn', title: 'Rotate preview', html: icon('rotL'), onclick: (e) => { e.stopPropagation(); ed.rotateView(-90); } }),
+      h('button', { class: 'icon-btn', title: 'Rotate preview', html: icon('rotR'), onclick: (e) => { e.stopPropagation(); ed.rotateView(90); } }));
+    this.miniRot = rot; mini.append(rot);
+    const flip = () => { ed.setMode(ed.cam.mode === '2d' ? 'iso' : '2d'); ed.fitView(); };
+    mini.addEventListener('click', flip);
+    mini.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
+    new ResizeObserver(() => this.drawMini(true)).observe(mini);
+  }
+  drawMini(now = false) {
+    if (this._mq && !now) return;
+    clearTimeout(this._mq);
+    this._mq = setTimeout(() => { this._mq = 0; this._drawMini(); }, now ? 0 : 90);
+  }
+  _drawMini() {
+    const ed = this.ed, cv = this.miniCv;
+    const r = cv.getBoundingClientRect();
+    if (r.width < 10) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.round(r.width * dpr), hh = Math.round(r.height * dpr);
+    if (cv.width !== w || cv.height !== hh) { cv.width = w; cv.height = hh; }
+    const other = ed.cam.mode === '2d' ? 'iso' : '2d';
+    const cam = this.miniCam;
+    cam.mode = other; cam.yaw = ed.cam.yaw;
+    cam.fit(ed.venuePoints(), r.width, r.height, 16);
+    this.miniR.draw(this.scene, cam, { style: 'soft', grid: false, tags: false, dpr, attrib: false });
+    $('#miniTag').textContent = other === 'iso' ? 'Isometric' : '2D plan';
+    this.miniRot.style.display = other === 'iso' ? 'flex' : 'none';
+    $('#mini').title = other === 'iso' ? 'Click to view in isometric' : 'Click to go back to the 2D plan';
   }
 
   // ------------------------------------------------------------------ library
@@ -225,7 +350,7 @@ export class UI {
       for (const it of items) {
         const card = h('div', { class: 'card' + (it.tool ? ' tool' : ''), draggable: !it.tool, title: it.name, 'data-id': it.id },
           h('canvas', { width: 1, height: 1 }), h('span', {}, it.name));
-        card.addEventListener('click', () => { this.ed.addPreset(it.id); this.ed.cv.focus(); if (window.innerWidth <= 820) $('#left').classList.remove('open'); });
+        card.addEventListener('click', () => { this.ed.addPreset(it.id); this.ed.cv.focus(); if (window.innerWidth <= 820) this.setLeft('assets', false, false); });
         card.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/venuely', it.id); e.dataTransfer.setData('text/plain', it.id); e.dataTransfer.effectAllowed = 'copy'; });
         cards.append(card);
         pending.push({ card, it });
@@ -257,17 +382,6 @@ export class UI {
         card.style.display = hit ? '' : 'none';
       }
       document.querySelectorAll('.cat').forEach((c) => { const any = [...c.querySelectorAll('.card')].some((x) => x.style.display !== 'none'); c.style.display = any ? '' : 'none'; if (q) c.classList.remove('closed'); });
-    });
-  }
-
-  buildTabs() {
-    const tabs = $('#leftTabs');
-    tabs.addEventListener('click', (e) => {
-      const t = e.target.dataset.tab; if (!t) return;
-      tabs.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === e.target));
-      document.querySelectorAll('.tabpane').forEach((p) => p.classList.toggle('on', p.id === 'pane' + t[0].toUpperCase() + t.slice(1)));
-      if (t === 'summary') this.renderSummary();
-      if (t === 'layers') this.renderLayers();
     });
   }
 
@@ -325,14 +439,17 @@ export class UI {
   renderProps() {
     const root = $('#props'), ed = this.ed, sc = this.scene;
     // keep scroll position when rebuilding in place
-    const sp = $('#right').scrollTop;
+    const right = $('#right');
+    const sel = ed.selected;
+    if (!sel.length && !this.showPlan) { right.hidden = true; root.innerHTML = ''; this.syncers = []; return; }
+    right.hidden = false;
+    const sp = right.scrollTop;
     root.innerHTML = '';
     this.syncers = [];
-    const sel = ed.selected;
     if (!sel.length) this.planPanel(root);
     else if (sel.length > 1) this.multiPanel(root, sel);
     else this.objectPanel(root, sel[0]);
-    $('#right').scrollTop = sp;
+    right.scrollTop = sp;
   }
 
   // --- field builders
@@ -364,6 +481,13 @@ export class UI {
     s.addEventListener('change', () => { set(s.value); this.ed.invalidate(); this.scene.commit(); onchange(); });
     return s;
   }
+  segInput(get, set, opts, onchange = () => { }) {
+    const wrap = h('div', { class: 'segctl' });
+    const paint = () => wrap.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === String(get())));
+    for (const [v, l] of opts) wrap.append(h('button', { 'data-v': String(v), onclick: () => { set(v); this.ed.invalidate(); this.scene.commit(); paint(); onchange(); } }, l));
+    paint();
+    return wrap;
+  }
   colorInput(get, set, { palette, optional } = {}) {
     const inp = h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(get()) ? get() : '#cccccc' });
     inp.addEventListener('input', () => { set(inp.value); this.ed.invalidate(); });
@@ -383,7 +507,8 @@ export class UI {
   // --- panels
   planPanel(root) {
     const sc = this.scene, ed = this.ed, m = sc.meta;
-    root.append(h('div', { class: 'sec' }, h('h3', {}, 'Plan settings'), h('div', { class: 'sub' }, 'Nothing selected – click an object to edit it.')));
+    root.append(h('div', { class: 'sec obj-head' }, h('div', {}, h('h3', {}, 'Plan settings'), h('div', { class: 'sub' }, 'Venue, ground and display')),
+      h('button', { class: 'icon-btn', title: 'Close', html: icon('close'), onclick: () => { this.showPlan = false; this.renderProps(); } })));
     const venue = h('div', { class: 'sec' }, h('h4', {}, 'Venue'),
       this.row('Width (m)', this.numInput(() => m.venue.w, (v) => { m.venue.w = v; }, { min: 5, max: 500, step: 1 })),
       this.row('Depth (m)', this.numInput(() => m.venue.d, (v) => { m.venue.d = v; }, { min: 5, max: 500, step: 1 })),
@@ -396,28 +521,16 @@ export class UI {
         h('button', { class: 'btn', html: icon('pin') + (mapOn ? 'Map settings' : 'Add a map'), onclick: () => openMapDialog(this) }),
         mapOn ? h('button', { class: 'btn', html: icon('mapmove') + 'Move map', onclick: () => this.ed.setTool('map') }) : null)));
     const view = h('div', { class: 'sec' }, h('h4', {}, 'Display'),
-      this.row('Show grid', this.switchInput(() => m.grid, (v) => { m.grid = v; }, () => this.syncView())),
-      this.row('Snap to grid', this.selInput(() => String(m.snap), (v) => { m.snap = parseFloat(v); }, [['0', 'Off'], ['0.1', '0.1 m'], ['0.25', '0.25 m'], ['0.5', '0.5 m'], ['1', '1 m']], () => this.syncView())),
-      this.row('Drawing style', this.selInput(() => m.style, (v) => { m.style = v; }, [['outline', 'Outlined (blueprint)'], ['soft', 'Soft (no outlines)']], () => this.syncView())));
+      this.row('Grid', this.segInput(() => (m.grid ? 'on' : 'off'), (v) => { m.grid = v === 'on'; }, [['on', 'Show'], ['off', 'Hide']], () => this.syncView())),
+      this.row('Snap (m)', this.segInput(() => String(m.snap), (v) => { m.snap = parseFloat(v); }, [['0', 'Off'], ['0.25', '0.25'], ['0.5', '0.5'], ['1', '1']], () => this.syncView())),
+      this.row('Style', this.segInput(() => m.style, (v) => { m.style = v; }, [['outline', 'Outlined'], ['soft', 'Soft']], () => this.syncView())));
     root.append(view);
-    root.append(h('div', { class: 'sec' }, h('h4', {}, 'Shortcuts'),
-      h('div', { class: 'shortcuts' },
-        h('span', { class: 'kbd' }, '2 / 3'), 'Flat / isometric view',
-        h('span', { class: 'kbd' }, 'Q / E'), 'Rotate isometric view',
-        h('span', { class: 'kbd' }, 'Space+drag'), 'Pan (or middle mouse)',
-        h('span', { class: 'kbd' }, 'Scroll'), 'Zoom to cursor',
-        h('span', { class: 'kbd' }, 'R'), 'Rotate selection 15°',
-        h('span', { class: 'kbd' }, 'Ctrl+D'), 'Duplicate',
-        h('span', { class: 'kbd' }, 'Arrows'), 'Nudge (Shift = 1 m)',
-        h('span', { class: 'kbd' }, '[ / ]'), 'Send back / forward',
-        h('span', { class: 'kbd' }, 'Del'), 'Delete',
-      ),
-      h('p', { class: 'hintp' }, 'Tip: drag the edge handles of a chair block to add rows & columns instantly.')));
   }
 
   multiPanel(root, sel) {
     const ed = this.ed;
-    root.append(h('div', { class: 'sec' }, h('h3', {}, `${sel.length} objects selected`), h('div', { class: 'sub' }, 'Shift-click to add or remove items.')));
+    root.append(h('div', { class: 'sec obj-head' }, h('div', {}, h('h3', {}, `${sel.length} items selected`), h('div', { class: 'sub' }, 'Shift-click to add or remove items.')),
+      h('button', { class: 'icon-btn', title: 'Deselect', html: icon('close'), onclick: () => ed.setSelection([]) })));
     const al = (ic, t, k) => h('button', { class: 'icon-btn', title: t, html: icon(ic), onclick: () => ed.align(k) });
     root.append(h('div', { class: 'sec' }, h('h4', {}, 'Align'),
       h('div', { class: 'btnrow' }, al('alL', 'Align left', 'left'), al('alCx', 'Align centre horizontally', 'cx'), al('alR', 'Align right', 'right'), al('alT', 'Align top', 'top'), al('alCy', 'Align middle', 'cy'), al('alB', 'Align bottom', 'bottom'), al('dx', 'Distribute horizontally', 'dx'), al('dy', 'Distribute vertically', 'dy'))));
@@ -443,8 +556,12 @@ export class UI {
     const flags = resizeFlags(o);
 
     // header
-    const head = h('div', { class: 'sec' }, h('h3', {}, a.name), h('div', { class: 'sub' }, a.cat));
-    head.append(h('div', { style: 'height:10px' }),
+    const thumb = h('canvas', { width: 80, height: 80 });
+    const pre = PALETTE.find((p) => p.asset === o.type && !p.tool);
+    if (pre) { try { thumb.getContext('2d').drawImage(thumbCanvas(pre.id, 40, 'iso', 'soft'), 0, 0, 80, 80); } catch (e) { /* ignore */ } }
+    const head = h('div', { class: 'sec' }, h('div', { class: 'obj-head' }, thumb, h('div', {}, h('h3', {}, a.name), h('div', { class: 'sub' }, a.cat)),
+      h('button', { class: 'icon-btn', title: 'Deselect', html: icon('close'), onclick: () => ed.setSelection([]) })));
+    head.append(h('div', { style: 'height:12px' }),
       this.row('Name', this.textInput(() => o.name, (v) => { o.name = v; })));
     if (o.type === 'label') head.append(this.row('Text', this.textInput(() => o.label, (v) => { o.label = v; touch(); })));
     else {
@@ -584,7 +701,7 @@ export class UI {
     sc.undoStack = []; sc.redoStack = [];
     sc.head = sc.snapshot(); sc.save();
     ed.setSelection([]);
-    ed.cam.mode = t && t.mode ? t.mode : 'iso'; ed.cam.yaw = 0;
+    ed.cam.mode = t && t.mode ? t.mode : '2d'; ed.cam.yaw = 0;
     ed.fitView();
     this.closeModal();
     this.syncView(); this.syncHistory();

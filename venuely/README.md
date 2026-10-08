@@ -31,7 +31,8 @@ Rebuild it after changing the source with `python3 tools/build-offline.py` (need
 - **Array modifier** on any item: grid (rows × columns, with aisles every N), circle / ring, or fan (curved rows).
   Drag a chair block's edge handles to add or remove rows and columns.
 - **Zones, roads & labels**: rectangle or free-polygon zones with names, drawn roads/paths (asphalt, paver, carpet, sand …), flow arrows, text labels.
-- **Views**: 2D plan ↔ isometric, rotate the isometric view in 90° steps, outline or soft drawing style, several ground themes.
+- **Views**: you work in a flat **2D plan**; a live **isometric preview** sits in the bottom-right corner. Click it to swap the two views. Rotate the isometric view in 90° steps, choose outline or soft drawing style and several ground themes.
+- **Workspace**: a slim icon rail (Library, Layers, Summary, Templates, Map), a floating properties card that appears only when something is selected, and a bottom toolbar with the drawing tools.
 - **Editing**: select / multi-select, move, rotate, snap, align & distribute, duplicate, copy / paste, layers panel (lock / hide), undo / redo.
 - **Map background**: show a real map under the layout (2D and isometric) and plan on top of the actual site.
   Sources: **Google Maps** (your own API key with the *Maps Static API* enabled), **Esri satellite** and **OpenStreetMap** (free, no key).
@@ -42,8 +43,8 @@ Rebuild it after changing the source with `python3 tools/build-offline.py` (need
 
 ## Shortcuts
 
-`2` / `3` view · `Q` / `E` rotate view · `Space`+drag pan · scroll zoom · `R` rotate · `Ctrl+D` duplicate ·
-`Ctrl+C/V` copy/paste · arrows nudge · `[` `]` order · `Del` delete · `Ctrl+Z` undo · `G` grid · `F` frame selection.
+`2` / `3` view (or click the preview) · `Q` / `E` rotate view · `Space`+drag pan · scroll zoom · `R` rotate · `Ctrl+D` duplicate ·
+`Ctrl+C/V` copy/paste · arrows nudge · `[` `]` order · `Del` delete · `Ctrl+Z` undo · `G` grid · `F` frame selection · `Ctrl+K` search the library.
 
 ## Code map
 
