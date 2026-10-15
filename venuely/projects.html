@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My projects – Venuely</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E%3Cpath d='M16 6l9 5v10l-9 5-9-5V11z' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M7 11l9 5 9-5M16 16v10' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="css/site.css">
+  <link rel="stylesheet" href="css/auth.css">
+</head>
+<body class="site">
+  <header class="nav scrolled">
+    <div class="wrap nav-in">
+      <a class="brand" href="index.html" aria-label="Venuely home">
+        <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#2563eb"/><path d="M16 6l9 5v10l-9 5-9-5V11z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M7 11l9 5 9-5M16 16v10" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>
+        Venuely
+      </a>
+      <nav class="nav-links" aria-label="Pages"><a href="index.html">Home</a><a href="app.html">Open the app</a></nav>
+      <div class="nav-grow"></div>
+      <div class="nav-actions"><span id="acct"></span></div>
+    </div>
+  </header>
+
+  <main class="wrap dash-main">
+    <div class="dash-head">
+      <div>
+        <h1>My projects</h1>
+        <p id="sub">Everything you have saved, newest first.</p>
+      </div>
+      <div class="dash-tools" id="tools" hidden>
+        <input class="search-box" id="q" type="search" placeholder="Search projects" aria-label="Search projects" autocomplete="off">
+        <a class="btn primary" href="app.html?new=1"><span data-i="plus" style="display:contents"></span>New project</a>
+      </div>
+    </div>
+    <div id="body"></div>
+  </main>
+
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>

@@ -2,84 +2,141 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <title>Venuely – Event Layout Studio</title>
-  <meta name="description" content="Plan event layouts in a flat 2D plan with a live isometric preview: stages, truss, tents, seating arrays, zones and roads.">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Venuely – Plan the whole event before it exists</title>
+  <meta name="description" content="Venuely is a simple layout tool for event planners. Place stages, truss, tents and seating, view the plan flat or in isometric, and export it for your client.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E%3Cpath d='M16 6l9 5v10l-9 5-9-5V11z' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M7 11l9 5 9-5M16 16v10' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/site.css">
+  <link rel="stylesheet" href="css/auth.css">
 </head>
-<body>
-  <main id="stage">
-    <canvas id="cv" tabindex="0"></canvas>
-    <div id="dropMask" class="drop-mask">Drop to place</div>
-  </main>
-
-  <!-- left rail -->
-  <nav id="rail" class="float" aria-label="Main"></nav>
-
-  <!-- left panel: library / layers / summary -->
-  <aside id="left" class="float panel">
-    <div class="panel-head">
-      <h2 id="leftTitle">Library</h2>
-      <button class="icon-btn" id="leftClose" title="Hide panel"></button>
+<body class="site">
+  <header class="nav" id="nav">
+    <div class="wrap nav-in">
+      <a class="brand" href="index.html" aria-label="Venuely home">
+        <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#2563eb"/><path d="M16 6l9 5v10l-9 5-9-5V11z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M7 11l9 5 9-5M16 16v10" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>
+        Venuely
+      </a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="#views">How it looks</a>
+        <a href="#features">Features</a>
+        <a href="#templates">Templates</a>
+        <a href="#how">How it works</a>
+      </nav>
+      <div class="nav-grow"></div>
+      <div class="nav-actions">
+        <span id="acct"></span>
+        <a class="btn primary" href="app.html">Open the app</a>
+      </div>
     </div>
-    <div class="tabpane on" id="paneAssets">
-      <div class="search"><input id="assetSearch" placeholder="Search items (Ctrl+K)" spellcheck="false" autocomplete="off"></div>
-      <div id="assetList"></div>
-    </div>
-    <div class="tabpane" id="paneLayers"></div>
-    <div class="tabpane" id="paneSummary"></div>
-  </aside>
-
-  <!-- top centre: plan name -->
-  <header id="topchip" class="float">
-    <svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#2563eb"/><path d="M16 6l9 5v10l-9 5-9-5V11z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M7 11l9 5 9-5M16 16v10" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>
-    <input id="planName" class="plan-name" spellcheck="false" aria-label="Plan name">
-    <span id="saved" class="saved" title="Your plan is saved in this browser automatically">Saved</span>
-    <button class="icon-btn" id="btnSettings" title="Plan settings"></button>
   </header>
 
-  <!-- top right -->
-  <div id="topright">
-    <button class="btn primary" id="btnShare"></button>
-  </div>
-
-  <!-- properties (appears when something is selected) -->
-  <aside id="right" class="float panel" hidden>
-    <div id="props"></div>
-  </aside>
-
-  <!-- bottom toolbar -->
-  <div id="toolbar" class="float"></div>
-  <div id="hint" class="hint"></div>
-
-  <!-- bottom right: view switcher + zoom -->
-  <div id="corner">
-    <div id="mini" class="mini" role="button" tabindex="0" aria-label="Switch between plan and isometric view">
-      <canvas id="miniCv"></canvas>
-      <span class="mini-tag" id="miniTag"></span>
-      <span class="mini-swap" id="miniSwap"></span>
-    </div>
-    <div id="zoomBox" class="float zoombox"></div>
-  </div>
-
-  <div id="modal" class="modal" hidden>
-    <div class="modal-card">
-      <div class="modal-head">
+  <main>
+    <section class="hero">
+      <div class="wrap hero-grid">
         <div>
-          <h2>Start a layout</h2>
-          <p>Pick a template to customise, or start from a blank plot.</p>
+          <span class="eyebrow"><i data-i="cube"></i>Layouts for event planners</span>
+          <h1>Plan the whole event <em>before it exists.</em></h1>
+          <p class="lead">Venuely is a layout tool for weddings, concerts, conferences and festivals. Drop in stages, truss, tents and seating, see the plan flat or in isometric, and send your client a clear picture.</p>
+          <div class="cta-row">
+            <a class="btn primary lg" href="app.html">Start planning, it's free</a>
+            <a class="btn lg" href="#templates">Browse templates</a>
+          </div>
+          <p class="fineprint"><span data-i="check" style="display:contents"></span>No account needed to design. Sign in only when you export or want to keep your projects.</p>
         </div>
-        <button class="icon-btn" id="modalClose" title="Close">✕</button>
+        <div class="hero-card">
+          <canvas id="heroCv" aria-label="Isometric plan of an open-air concert"></canvas>
+          <div class="hero-chip">Open-air concert <span>template</span></div>
+        </div>
       </div>
-      <div id="tplGrid" class="tpl-grid"></div>
-    </div>
-  </div>
-  <div id="toast" class="toast"></div>
-  <input type="file" id="fileOpen" accept=".json,application/json" hidden>
+    </section>
 
-  <script type="module" src="js/main.js"></script>
+    <section class="block" id="views">
+      <div class="wrap two-views">
+        <div>
+          <div class="sec-head" style="margin-bottom:0">
+            <h2>Work flat. Check it in 3D.</h2>
+            <p>Draw in a clean 2D plan where distances are easy to read. A small isometric preview sits in the corner and updates as you work. Click it to swap the views.</p>
+          </div>
+          <ul class="ticks">
+            <li><span data-i="check" style="display:contents"></span>Both views come from one plan, so they never drift apart.</li>
+            <li><span data-i="check" style="display:contents"></span>Rotate the isometric view to check sightlines from every side.</li>
+            <li><span data-i="check" style="display:contents"></span>Everything is drawn to scale in metres, with a live scale bar.</li>
+          </ul>
+        </div>
+        <div class="mock" aria-hidden="true">
+          <canvas class="main" id="mockMain"></canvas>
+          <div class="mock-bar"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="mock-mini"><canvas id="mockMini"></canvas><b>Isometric</b></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="features" style="padding-top:20px">
+      <div class="wrap">
+        <div class="sec-head">
+          <h2>The pieces an event plan actually needs</h2>
+          <p>Built around how planners work: real event equipment, quick seating, and clear zones.</p>
+        </div>
+        <div class="features">
+          <article class="feat"><i data-i="cube"></i><h3>75+ ready-made items</h3><p>Chairs, sofas, round and banquet tables, stages, LED screens, speakers, tents, food stalls, toilets, trees. Every item resizes and recolours.</p></article>
+          <article class="feat"><i data-i="bulb"></i><h3>Truss and lighting</h3><p>Goalpost, T, L and box rigs, with par, moving-head and spot lights on the beam. Switch on light beams to see what they cover.</p></article>
+          <article class="feat"><i data-i="rows"></i><h3>Seating in seconds</h3><p>Turn one chair into rows with aisles, a ring, or a fan. Drag an edge to add rows and columns and watch the seat count update.</p></article>
+          <article class="feat"><i data-i="poly"></i><h3>Zones, roads and labels</h3><p>Draw named zones for VIP, food court and parking. Lay roads and paths, add flow arrows and text labels.</p></article>
+          <article class="feat"><i data-i="pin"></i><h3>Plan on the real site</h3><p>Show a satellite or street map under your layout and plan to scale, with Google Maps, Esri or OpenStreetMap.</p></article>
+          <article class="feat"><i data-i="list"></i><h3>Counts for quotes</h3><p>The summary lists every item and the total number of seats, ready for hire lists and client quotes.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="templates" style="padding-top:20px">
+      <div class="wrap">
+        <div class="sec-head">
+          <h2>Start from a layout that already works</h2>
+          <p>Each template opens fully editable. Move things, swap things, delete what you don't need.</p>
+        </div>
+        <div class="tpls" id="tplList"></div>
+      </div>
+    </section>
+
+    <section class="block" id="how" style="padding-top:20px">
+      <div class="wrap">
+        <div class="sec-head">
+          <h2>From blank plot to client-ready plan</h2>
+        </div>
+        <div class="steps">
+          <div class="step"><h3>Pick a starting point</h3><p>Choose a template or a blank plot. Set the venue size, or put a map underneath and plan on the real site.</p></div>
+          <div class="step"><h3>Build the layout</h3><p>Drag in stages, truss, tents and seating. Resize, rotate, array the chairs and draw zones with names.</p></div>
+          <div class="step"><h3>Export and keep it</h3><p>Download an image or PDF for your client. Your projects stay in your dashboard so you can come back and edit.</p></div>
+        </div>
+
+        <div class="account-band">
+          <div>
+            <h2>Free to design. Sign in when you export.</h2>
+            <p>Open the app and start straight away. Create a free account with Google or email when you want to download your plan or keep projects in your dashboard.</p>
+            <div class="cta-row">
+              <a class="btn primary lg" href="app.html">Open the app</a>
+              <a class="btn ghost-light lg" href="projects.html">My projects</a>
+            </div>
+          </div>
+          <div class="pass-list">
+            <div class="pass"><i data-i="select"></i><div><b>Design without an account</b><span>Every tool and template is open to everyone.</span></div></div>
+            <div class="pass"><i data-i="download"></i><div><b>Export with a free account</b><span>Image, PDF and plan file downloads.</span></div></div>
+            <div class="pass"><i data-i="cube"></i><div><b>Projects saved in your dashboard</b><span>Reopen, rename and duplicate any time.</span></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap foot-in">
+      <div>© 2026 Venuely</div>
+      <div><a href="app.html">Open the app</a><a href="#templates">Templates</a><a href="projects.html">My projects</a></div>
+    </div>
+  </footer>
+
+  <script type="module" src="js/home.js"></script>
 </body>
 </html>

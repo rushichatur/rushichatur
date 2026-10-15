@@ -767,8 +767,9 @@ export class Editor {
 
   // ---- export -------------------------------------------------------------------------------------------
   /** Render the plan to an offscreen canvas, framed on the venue. */
-  renderToCanvas(maxW = 2400, { tags = true, bg = true } = {}) {
+  renderToCanvas(maxW = 2400, { tags = true, bg = true, mode, scaleBar = true } = {}) {
     const cam = this.cam.clone();
+    if (mode) cam.mode = mode;
     // measure aspect at zoom 1
     const m = cam.clone(); m.zoom = 1; m.px = 0; m.py = 0;
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -782,7 +783,7 @@ export class Editor {
     cv.width = W; cv.height = H;
     cam.zoom = scale; cam.px = pad - x0 * scale; cam.py = pad - y0 * scale;
     const r = new Renderer(cv);
-    r.draw(this.scene, cam, { style: this.scene.meta.style, grid: this.scene.meta.grid, scaleBar: true, dpr: 1, tags, bg });
+    r.draw(this.scene, cam, { style: this.scene.meta.style, grid: this.scene.meta.grid, scaleBar, dpr: 1, tags, bg });
     return cv;
   }
 }

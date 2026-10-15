@@ -3,13 +3,45 @@
 A zero-build web app for planning event layouts (weddings, concerts, conferences, festivals, parties) in
 **flat 2D plan view** or **isometric view**. Everything is modelled once and drawn in both views.
 
+## Pages
+
+| Page | What it is |
+|---|---|
+| `index.html` | Home page: what Venuely is, features, templates, and a way into the app |
+| `app.html` | The editor. Anyone can design; export, print and saving need a free account |
+| `projects.html` | Dashboard of the signed-in person's saved projects (open, rename, duplicate, delete) |
+
+## Accounts and saved projects
+
+Signing in uses **Firebase** (Google + email/password) and saves projects to **Firestore**. Until you add your keys the site runs in **demo mode**: accounts and projects live in the visitor's browser only, which is fine for trying things out but is not real security or sync.
+
+To switch on real accounts:
+
+1. Create a free project at <https://console.firebase.google.com>.
+2. *Build → Authentication → Get started*: enable **Google** and **Email/Password**. Under *Settings → Authorized domains* add the domain you host on.
+3. *Build → Firestore Database → Create database*, then paste these rules:
+
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{db}/documents {
+       match /users/{uid}/{document=**} {
+         allow read, write: if request.auth != null && request.auth.uid == uid;
+       }
+     }
+   }
+   ```
+4. *Project settings → Your apps → Web app* and copy the config into `js/config.js` as `FIREBASE_CONFIG`.
+
+Data layout: `users/{uid}/projects/{id}` (name, updated, item count, thumbnail) and `users/{uid}/projectData/{id}` (the plan as JSON).
+
 ## Run it
 
 It is plain HTML + ES modules, so any static server works:
 
 ```bash
 cd venuely
-python3 -m http.server 8000      # then open http://localhost:8000
+python3 -m http.server 8000      # then open http://localhost:8000 (home), /app.html, /projects.html
 ```
 
 It can also be hosted as-is on GitHub Pages / Netlify. Plans autosave to the browser's local storage.
@@ -59,5 +91,7 @@ Rebuild it after changing the source with `python3 tools/build-offline.py` (need
 | `js/ui.js` | Panels, properties form, menus, template picker |
 | `js/templates.js` | Starter layouts |
 | `js/maps.js`, `js/mapui.js` | Map imagery planning / loading and the Map panel |
+| `js/auth.js`, `js/cloud.js`, `js/authui.js`, `js/config.js` | Sign-in (Firebase or demo), saved projects, sign-in dialog |
+| `js/home.js`, `js/dashboard.js` | Home page and dashboard scripts |
 
 To add an asset, call `def('my_asset', {...})` in `assets.js` with a `build(o, P)` function and add a preset to `PALETTE`.

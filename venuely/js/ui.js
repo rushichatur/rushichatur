@@ -10,63 +10,13 @@ import { openMapDialog } from './mapui.js';
 import { isActive } from './maps.js';
 import { TEMPLATES } from './templates.js';
 import { Scene } from './scene.js';
+import { auth } from './auth.js';
+import { cloud } from './cloud.js';
+import { openAuthDialog, mountAccount } from './authui.js';
+import { uid } from './util.js';
 
-// ---- icons -------------------------------------------------------------------
-const I = {
-  select: '<path d="M5 3l14 7-6 2.2L10.8 19z"/>',
-  cube: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>',
-  list: '<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
-  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.500a2.500 2.500 0 114 2c-.9.6-1.500 1-1.500 2M12 17h.01"/>',
-  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.400 15a1.700 1.700 0 00.3 1.800l.1.1a2 2 0 11-2.800 2.800l-.1-.1a1.700 1.700 0 00-1.800-.3 1.700 1.700 0 00-1 1.500V21a2 2 0 11-4 0v-.1a1.700 1.700 0 00-1.100-1.500 1.700 1.700 0 00-1.800.3l-.1.1a2 2 0 11-2.800-2.800l.1-.1a1.700 1.700 0 00.3-1.800 1.700 1.700 0 00-1.500-1H3a2 2 0 110-4h.1a1.700 1.700 0 001.500-1.100 1.700 1.700 0 00-.3-1.800l-.1-.1a2 2 0 112.800-2.800l.1.1a1.700 1.700 0 001.800.3H9a1.700 1.700 0 001-1.500V3a2 2 0 114 0v.1a1.700 1.700 0 001 1.500 1.700 1.700 0 001.800-.3l.1-.1a2 2 0 112.800 2.800l-.1.1a1.700 1.700 0 00-.3 1.800V9a1.700 1.700 0 001.500 1H21a2 2 0 110 4h-.1a1.700 1.700 0 00-1.500 1z"/>',
-  share: '<path d="M12 15V3M8 7l4-4 4 4M5 13v6a2 2 0 002 2h10a2 2 0 002-2v-6"/>',
-  users: '<circle cx="9" cy="8" r="3.500"/><path d="M2.500 20a6.500 6.500 0 0113 0M16 5a3.500 3.500 0 010 7M18 14a6.500 6.500 0 013.500 6"/>',
-  swap: '<path d="M7 7h11l-3-3M17 17H6l3 3"/>',
-  text: '<path d="M5 6V5h14v1M12 5v14M9 19h6"/>',
-  close: '<path d="M6 6l12 12M18 6L6 18"/>',
-  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0114 0C19 14.800 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
-  mapmove: '<path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/>',
-  hand: '<path d="M8 13V5.5a1.5 1.5 0 013 0V11m0-6.5a1.5 1.5 0 013 0V11m0-4.5a1.5 1.5 0 013 0V15a6 6 0 01-6 6h-.5a6 6 0 01-5-2.7l-3-4.6a1.5 1.5 0 012.4-1.8L8 14"/>',
-  poly: '<path d="M4 8l6-4 9 3 1 9-8 4-8-4z"/><circle cx="4" cy="8" r="1.2"/><circle cx="10" cy="4" r="1.2"/><circle cx="19" cy="7" r="1.2"/><circle cx="20" cy="16" r="1.2"/><circle cx="12" cy="20" r="1.2"/><circle cx="4" cy="16" r="1.2"/>',
-  road: '<path d="M4 20c0-7 4-6 8-9s2-7 8-7"/><path d="M8 20c2-1 2-3 4-4" stroke-dasharray="2 3"/>',
-  undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h9a7 7 0 010 14h-3"/>',
-  redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9h-9a7 7 0 000 14h3"/>',
-  grid: '<path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/>',
-  magnet: '<path d="M6 15V4h4v11a2 2 0 004 0V4h4v11a6 6 0 01-12 0zM6 8h4M14 8h4"/>',
-  rotL: '<path d="M3 12a9 9 0 109-9 9 9 0 00-6.5 2.8L3 8"/><path d="M3 3v5h5"/>',
-  rotR: '<path d="M21 12a9 9 0 11-9-9 9 9 0 016.5 2.8L21 8"/><path d="M21 3v5h-5"/>',
-  fit: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
-  plus: '<path d="M12 5v14M5 12h14"/>',
-  minus: '<path d="M5 12h14"/>',
-  download: '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
-  upload: '<path d="M12 21V9M7 14l5-5 5 5M4 3h16"/>',
-  image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/>',
-  file: '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>',
-  print: '<path d="M7 9V3h10v6M7 17H4v-7h16v7h-3M7 14h10v7H7z"/>',
-  tpl: '<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="3" y="13" width="8" height="5" rx="1.5"/><rect x="13" y="10" width="8" height="8" rx="1.5"/>',
-  trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
-  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3"/>',
-  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>',
-  unlock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 017.5-2"/>',
-  eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
-  eyeOff: '<path d="M3 3l18 18M10.6 6.2A9 9 0 0112 6c6 0 10 6 10 6a17 17 0 01-3.3 3.8M6.3 7.7A17 17 0 002 12s4 7 10 7a9 9 0 004.2-1"/>',
-  chev: '<path d="M6 9l6 6 6-6"/>',
-  up: '<path d="M12 19V5M6 11l6-6 6 6"/>',
-  down: '<path d="M12 5v14M6 13l6 6 6-6"/>',
-  front: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
-  back: '<path d="M12 21l-9-5 9-5 9 5z"/><path d="M3 11l9-5 9 5"/>',
-  panelL: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
-  panelR: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/>',
-  style: '<path d="M12 3a9 9 0 100 18c1.5 0 2-1 1.5-2s0-2 1.5-2h2a3 3 0 003-3A9 9 0 0012 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16.5" cy="11" r="1"/>',
-  alL: '<path d="M4 3v18M8 7h12v4H8zM8 14h7v4H8z"/>',
-  alCx: '<path d="M12 3v18M5 7h14v4H5zM8 14h8v4H8z"/>',
-  alR: '<path d="M20 3v18M4 7h12v4H4zM9 14h7v4H9z"/>',
-  alT: '<path d="M3 4h18M7 8v12h4V8zM14 8v7h4V8z"/>',
-  alCy: '<path d="M3 12h18M7 5v14h4V5zM14 8v8h4V8z"/>',
-  alB: '<path d="M3 20h18M7 4v12h4V4zM14 9v7h4V9z"/>',
-  dx: '<path d="M4 4v16M20 4v16M9 8h6v8H9z"/>',
-  dy: '<path d="M4 4h16M4 20h16M8 9h8v6H8z"/>',
-};
-export const icon = (n) => `<svg viewBox="0 0 24 24" aria-hidden="true">${I[n] || ''}</svg>`;
+import { icon } from './icons.js';
+export { icon };
 
 const $ = (s) => document.querySelector(s);
 
@@ -77,7 +27,10 @@ export class UI {
     this.showPlan = false;
     this.leftTab = 'assets';
     this.buildRail();
+    this.project = null;
+    this.loadingProject = false;
     this.buildChrome();
+    this.initAccount();
     this.buildToolbar();
     this.buildMini();
     this.buildLibrary();
@@ -125,9 +78,85 @@ export class UI {
     const t = $('#toast'); t.textContent = m; t.classList.add('show');
     clearTimeout(this._tt); this._tt = setTimeout(() => t.classList.remove('show'), 2200);
   }
-  flashSaved() {
-    const s = $('#saved'); if (!s) return;
-    s.textContent = 'Saved'; s.style.color = '';
+  flashSaved() { /* status is driven by setSaveState */ }
+
+  // ------------------------------------------------------------------ account + cloud projects
+  initAccount() {
+    mountAccount($('#acct'), {
+      extraItems: () => [h('button', { class: 'menu-item', html: icon('file') + '<span>Save now</span>', onclick: () => this.saveProject(true) })],
+    });
+    let prev;
+    auth.onChange((u) => {
+      const was = prev; prev = u;
+      this.setSaveState(u ? (this.project ? 'saved' : 'idle') : 'draft');
+      // signed in during this visit: keep their work in their account
+      if (u && was === null && !this.loadingProject && !this.project && this.scene.objects.length) this.saveProject();
+    });
+    this.scene.on((k) => { if (k === 'commit') this.scheduleSave(); });
+    $('#saved').addEventListener('click', () => { if (!auth.user) this.requireAuth('Sign in to save your projects and export your plans.', () => { }); });
+  }
+
+  setSaveState(state) {
+    this.saveState = state;
+    const el = $('#saved'); if (!el) return;
+    el.textContent = { draft: 'Draft · sign in to save', idle: 'Not saved yet', saving: 'Saving…', saved: 'Saved to your projects', error: 'Could not save' }[state];
+    el.classList.toggle('clickable', state === 'draft');
+    el.classList.toggle('err', state === 'error');
+    el.title = state === 'draft' ? 'Sign in to keep this project in your account' : '';
+  }
+
+  /** Run `fn` now if signed in, otherwise ask the person to sign in first. */
+  requireAuth(reason, fn) {
+    if (auth.user) { fn(); return; }
+    if (!auth.ready) { auth.init().then(() => this.requireAuth(reason, fn)); return; }
+    openAuthDialog({ reason, onSuccess: fn });
+  }
+
+  scheduleSave() {
+    if (!auth.user || this.loadingProject) return;
+    if (!this.project && !this.scene.objects.length) return;
+    this.setSaveState('saving');
+    clearTimeout(this._saveT);
+    this._saveT = setTimeout(() => this.saveProject(), 1200);
+  }
+
+  async saveProject(manual = false) {
+    if (!auth.user) { if (manual) this.requireAuth('Sign in to save your project.', () => this.saveProject(true)); return; }
+    const sc = this.scene;
+    if (!sc.objects.length && !this.project && !manual) return;
+    clearTimeout(this._saveT);
+    const id = (this.project && this.project.id) || sc.meta.projectId || uid() + uid();
+    if (sc.meta.projectId !== id) { sc.meta.projectId = id; sc.head = sc.snapshot(); sc.save(); }
+    this.setSaveState('saving');
+    try {
+      let thumb;
+      if (!this._thumbAt || Date.now() - this._thumbAt > 20000 || !this.project) {
+        try { thumb = this.ed.renderToCanvas(420, { tags: false, mode: 'iso', scaleBar: false }).toDataURL('image/jpeg', 0.72); this._thumbAt = Date.now(); } catch (e) { thumb = undefined; }
+      }
+      await cloud.save({ id, name: sc.meta.name || 'Untitled event', data: sc.snapshot(), count: sc.objects.length, thumb });
+      this.project = { id };
+      try { history.replaceState(null, '', location.pathname + '?p=' + id); } catch (e) { /* ignore */ }
+      this.setSaveState('saved');
+      if (manual) this.toast('Saved to your projects');
+    } catch (e) {
+      this.setSaveState('error');
+      this.toast(e.message || 'Could not save your project');
+    }
+  }
+
+  /** Load a project from the dashboard link. */
+  openProject(p) {
+    this.loadingProject = false;
+    this.scene.load(p.data);
+    this.scene.undoStack = []; this.scene.redoStack = [];
+    this.scene.meta.projectId = p.id;
+    this.scene.head = this.scene.snapshot(); this.scene.save();
+    this.project = { id: p.id };
+    this.ed.setSelection([]);
+    this.ed.cam.mode = '2d'; this.ed.cam.yaw = 0;
+    this.ed.fitView();
+    this.syncView(); this.syncHistory(); this.setSaveState('saved');
+    this.closeModal();
   }
 
   // ------------------------------------------------------------------ left rail + panel
@@ -190,14 +219,17 @@ export class UI {
     this.menu = m;
   }
   shareMenu(anchor) {
+    const locked = !auth.user ? 'Free account needed' : '';
     const item = (ic, label, fn, sub, dis) => h('button', { html: icon(ic) + `<span>${label}${sub ? `<small>${sub}</small>` : ''}</span>`, disabled: dis, onclick: () => { this.closeMenu(); fn(); } });
+    const gated = (reason, fn) => () => this.requireAuth(reason, fn);
     this.openMenu(anchor, [
-      item('image', 'Download image (PNG)', () => this.exportPNG()),
-      item('print', 'Print / save as PDF', () => this.exportPrint()),
+      item('file', 'Save to my projects', () => this.saveProject(true), auth.user ? '' : 'Free account needed'),
       h('hr'),
-      item('file', 'Save plan file (.json)', () => this.exportJSON()),
-      item('upload', 'Open plan file', () => $('#fileOpen').click()),
+      item('image', 'Download image (PNG)', gated('Sign in to download your plan as an image.', () => this.exportPNG()), locked),
+      item('print', 'Print / save as PDF', gated('Sign in to print or save your plan as a PDF.', () => this.exportPrint()), locked),
+      item('download', 'Save plan file (.json)', gated('Sign in to download your plan file.', () => this.exportJSON()), locked),
       h('hr'),
+      item('upload', 'Open a plan file', () => $('#fileOpen').click()),
       item('users', 'Invite people', () => { }, 'Live teamwork is coming soon', true),
     ], (m, r) => { m.style.top = r.bottom + 8 + 'px'; m.style.right = Math.max(8, window.innerWidth - r.right) + 'px'; });
   }
@@ -246,7 +278,7 @@ export class UI {
   importJSON(file) {
     const rd = new FileReader();
     rd.onload = () => {
-      try { this.scene.load(rd.result); this.scene.commit(); this.ed.setSelection([]); this.ed.fitView(); this.toast('Plan opened'); } catch (e) { this.toast('Could not read that file'); }
+      try { this.scene.load(rd.result); delete this.scene.meta.projectId; this.project = null; this.scene.commit(); this.ed.setSelection([]); this.ed.fitView(); this.toast('Plan opened'); } catch (e) { this.toast('Could not read that file'); }
     };
     rd.readAsText(file);
   }
@@ -703,8 +735,10 @@ export class UI {
     ed.setSelection([]);
     ed.cam.mode = t && t.mode ? t.mode : '2d'; ed.cam.yaw = 0;
     ed.fitView();
+    this.project = null; this.loadingProject = false;
     this.closeModal();
     this.syncView(); this.syncHistory();
+    if (auth.user && sc.objects.length) this.saveProject();
     if (!silent) this.toast(t && t.build ? `Loaded “${t.name}” – everything is editable` : 'New blank plan');
   }
 }

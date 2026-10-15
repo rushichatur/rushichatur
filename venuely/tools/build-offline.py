@@ -9,7 +9,7 @@ cmd = [esb] if esb else ['npx', '--yes', 'esbuild']
 subprocess.run(cmd + [str(root / 'js/main.js'), '--bundle', '--minify', '--format=iife', '--target=es2020', f'--outfile={tmp}'], check=True)
 js = tmp.read_text().replace('</script', '<\\/script')
 css = (root / 'css/app.css').read_text()
-html = (root / 'index.html').read_text()
+html = (root / 'app.html').read_text()
 body = re.search(r'<body>(.*)</body>', html, re.S).group(1)
 body = body.replace('<script type="module" src="js/main.js"></script>', '')
 icon = re.search(r'<link rel="icon"[^>]*>', html).group(0)

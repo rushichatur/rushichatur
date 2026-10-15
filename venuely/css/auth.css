@@ -1,0 +1,41 @@
+/* Sign-in dialog + account button (loaded by every page). */
+.auth-open { overflow: hidden; }
+.auth-modal { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(15, 20, 35, .5); backdrop-filter: blur(4px); font-family: Inter, system-ui, sans-serif; }
+.auth-card { position: relative; width: min(400px, 100%); max-height: 100%; overflow: auto; background: #fff; border-radius: 20px; padding: 30px 28px 24px; box-shadow: 0 30px 80px rgba(0, 0, 0, .35); color: #161c28; font-size: 13.5px; }
+.auth-x { position: absolute; right: 12px; top: 12px; color: #8b94a5; }
+.auth-logo { margin-bottom: 14px; display: flex; }
+.auth-card h2 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
+.auth-sub { margin: 6px 0 20px; color: #566074; line-height: 1.45; }
+.auth-google { width: 100%; height: 44px; border: 1px solid #d9dee6; background: #fff; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; font: inherit; font-weight: 600; color: #161c28; cursor: pointer; transition: background .12s, border-color .12s; }
+.auth-google:hover:not(:disabled) { background: #f6f8fb; border-color: #c4cbd6; }
+.auth-google:disabled { opacity: .5; cursor: not-allowed; }
+.auth-or { display: flex; align-items: center; gap: 12px; margin: 16px 0; color: #8b94a5; font-size: 12px; }
+.auth-or::before, .auth-or::after { content: ''; flex: 1; height: 1px; background: #e8ebf0; }
+.auth-form { display: flex; flex-direction: column; gap: 10px; }
+.auth-form input { height: 44px; border: 1px solid #d9dee6; border-radius: 12px; padding: 0 14px; font: inherit; background: #fff; color: #161c28; width: 100%; }
+.auth-form input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px #eaf1ff; }
+.auth-form input[hidden] { display: none; }
+.auth-submit { height: 46px; border-radius: 12px; font-size: 14px; margin-top: 2px; }
+.auth-submit.busy, .auth-google.busy { opacity: .65; cursor: progress; }
+.auth-err { padding: 9px 12px; border-radius: 10px; background: #fdecec; color: #a12327; font-size: 12.5px; line-height: 1.4; }
+.auth-err.ok { background: #e7f7ee; color: #176b3a; }
+.auth-err[hidden] { display: none; }
+.auth-links { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.auth-link { border: 0; background: none; padding: 0; font: inherit; font-size: 12.5px; color: #2563eb; font-weight: 600; cursor: pointer; }
+.auth-link:hover { text-decoration: underline; }
+.auth-link[hidden] { display: none; }
+.auth-demo { margin: 16px 0 0; padding: 10px 12px; border-radius: 10px; background: #fff7e6; color: #8a5a00; font-size: 12px; line-height: 1.45; }
+
+.avatar { width: 38px; height: 38px; border-radius: 50%; border: 2px solid #fff; background: #2563eb; color: #fff; font: inherit; font-weight: 700; cursor: pointer; overflow: hidden; display: grid; place-items: center; box-shadow: 0 2px 10px rgba(18, 28, 52, .18); padding: 0; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.acct-menu { min-width: 240px; }
+.acct-head { padding: 10px 12px 8px; display: flex; flex-direction: column; gap: 2px; }
+.acct-head span { color: #8b94a5; font-size: 12px; word-break: break-all; }
+.menu-item { display: flex; width: 100%; gap: 11px; align-items: center; border: 0; background: transparent; padding: 9px 10px; border-radius: 9px; text-align: left; font: inherit; font-weight: 500; color: inherit; text-decoration: none; cursor: pointer; }
+.menu-item:hover { background: #f1f4f9; }
+.menu-item svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; color: #566074; flex: none; }
+
+/* popover menu used outside the app (dashboard, account menu) */
+.menu { position: fixed; background: #fff; border: 1px solid #e8ebf0; border-radius: 14px; box-shadow: 0 10px 34px rgba(18, 28, 52, .14), 0 1px 3px rgba(18, 28, 52, .08); padding: 6px; z-index: 120; min-width: 230px; font-family: Inter, system-ui, sans-serif; font-size: 14px; color: #161c28; }
+.menu hr { border: 0; border-top: 1px solid #e8ebf0; margin: 5px 0; }
