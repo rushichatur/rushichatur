@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Rushi Chatur · Portfolio</title>
+  <meta name="description" content="A 2D side-scrolling portfolio: 3D projects, UI/UX case studies, designs and skills. Scroll to walk, swim, drive and fly." />
+  <meta name="theme-color" content="#7cd5ff" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <canvas id="scene" aria-hidden="true"></canvas>
+  <div id="world"></div>
+
+  <header class="hud">
+    <button class="brand" id="brand" title="Back to start">
+      <span class="logo" id="logo">R</span><span class="brand-name" id="brandName"></span>
+    </button>
+    <nav class="chapters" id="chapters" aria-label="Sections"></nav>
+    <div class="coins" title="Coins collected"><span class="coin-ic"></span><b id="coinCount">0</b></div>
+  </header>
+
+  <div class="hint" id="hint">
+    <span class="hint-touch">Swipe or tap ◀ ▶ to move</span>
+    <span class="hint-desk"><kbd>Scroll</kbd> or <kbd>W</kbd> <kbd>S</kbd> to move</span>
+    <span class="hint-sep">·</span>
+    <span><kbd>Space</kbd> to jump</span>
+  </div>
+  <div class="zone-toast" id="zoneToast" aria-live="polite"></div>
+
+  <button class="list-btn" id="listBtn">☰ List view</button>
+
+  <div class="touch-ctrls" id="touchCtrls">
+    <button data-dir="-1" aria-label="Move back">◀</button>
+    <button data-jump aria-label="Jump">⤒</button>
+    <button data-dir="1" aria-label="Move forward">▶</button>
+  </div>
+
+  <div class="modal" id="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+      <button class="modal-close" id="mClose" aria-label="Close">×</button>
+      <div class="m-thumb" id="mThumb"></div>
+      <div class="m-body">
+        <span class="m-kicker" id="mKicker"></span>
+        <h2 id="mTitle"></h2>
+        <p id="mDesc"></p>
+        <div class="tags" id="mTags"></div>
+        <a class="btn" id="mLink" target="_blank" rel="noopener">Open project ↗</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="listview" id="listView" hidden>
+    <div class="lv-panel" role="dialog" aria-modal="true" aria-label="Portfolio list view">
+      <button class="modal-close" id="lvClose" aria-label="Close">×</button>
+      <div id="lvContent"></div>
+    </div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
