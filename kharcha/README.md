@@ -13,8 +13,9 @@ Kharcha picks up your payments on its own and only asks you one thing: **what wa
 
 ## Install on your phone
 
-1. Open the repo's **Actions** tab on GitHub → the latest green **Kharcha Android build** run → download **Kharcha-apk** (a zip holding `Kharcha.apk`).
-2. Unzip it and open `Kharcha.apk`. Allow "Install unknown apps" when Android asks.
+1. On your phone, open the repo's **Releases** page (github.com/rushichatur/rushichatur/releases), pick the newest **Kharcha build**, and tap **Kharcha.apk**.
+2. Open the downloaded file. Allow "Install unknown apps" when Android asks. If Play Protect warns you, tap **More details → Install anyway**.
+   - Seeing "App not installed"? Make sure you opened the `.apk` itself (not a `.zip`), and uninstall any older Kharcha first.
 3. Open Kharcha → **Setup** tab → turn on the three switches (SMS, notification access, alerts).
    - If Android says **"Restricted setting"**: App info → ⋮ (top right) → **Allow restricted settings**, then try again.
 4. Optional: in Setup, tap **Last 30 days** to import past bank SMS, then sort them in **Review** (or use *Accept all suggestions*).

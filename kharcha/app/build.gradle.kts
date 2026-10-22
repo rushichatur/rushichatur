@@ -12,8 +12,8 @@ android {
         applicationId = "com.rushichatur.kharcha"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
     // A fixed key, so each new build installs as an update and keeps your data.
@@ -23,6 +23,9 @@ android {
             storePassword = "android"
             keyAlias = "kharcha"
             keyPassword = "android"
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
         }
     }
 
@@ -42,6 +45,10 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 }
 

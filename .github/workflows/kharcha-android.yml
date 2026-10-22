@@ -10,6 +10,9 @@ on:
       - "kharcha/**"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -31,10 +34,27 @@ jobs:
 
       - name: Build APK
         run: |
-          ./gradlew --no-daemon assembleDebug
-          cp app/build/outputs/apk/debug/app-debug.apk Kharcha.apk
+          ./gradlew --no-daemon assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk Kharcha.apk
+
+      - name: Check the APK is installable
+        run: |
+          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          "$BT/apksigner" verify --verbose Kharcha.apk
+          "$BT/aapt2" dump badging Kharcha.apk | grep -E "^(package|sdkVersion|targetSdkVersion|application-debuggable|testOnly)" || true
 
       - uses: actions/upload-artifact@v4
         with:
           name: Kharcha-apk
           path: kharcha/Kharcha.apk
+
+      # Each build gets its own Releases entry, so the phone downloads a plain .apk (no zip).
+      - name: Publish release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "kharcha-build-${GITHUB_RUN_NUMBER}" Kharcha.apk \
+            --target "$GITHUB_SHA" \
+            --title "Kharcha build ${GITHUB_RUN_NUMBER}" \
+            --notes "Tap Kharcha.apk below on your phone to download it, then open it to install."
