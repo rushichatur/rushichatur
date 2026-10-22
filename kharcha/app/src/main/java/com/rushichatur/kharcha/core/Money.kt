@@ -11,6 +11,13 @@ object Money {
         return value.movePointRight(2).toLong()
     }
 
+    /** 12345650 paise -> "123456.50" (for pre-filling input boxes). */
+    fun plain(paise: Long): String {
+        val r = paise / 100
+        val p = paise % 100
+        return if (p == 0L) "$r" else "$r." + p.toString().padStart(2, '0')
+    }
+
     /** 12345600 paise -> "₹1,23,456" (Indian digit grouping, paise shown only when non-zero). */
     fun format(paise: Long): String {
         val negative = paise < 0

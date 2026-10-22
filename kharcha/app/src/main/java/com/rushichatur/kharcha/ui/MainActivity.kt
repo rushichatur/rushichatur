@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
+import com.rushichatur.kharcha.data.DueKind
 import com.rushichatur.kharcha.data.Repository
 import com.rushichatur.kharcha.ingest.Notifier
 import kotlinx.coroutines.Dispatchers
@@ -82,7 +83,7 @@ class MainActivity : ComponentActivity() {
 }
 
 enum class Tab(val label: String, val emoji: String) {
-    HOME("Home", "🏠"), REVIEW("Review", "📝"), HISTORY("History", "📜"), SETUP("Setup", "⚙️")
+    HOME("Home", "🏠"), REVIEW("Review", "📝"), DUES("Dues", "🤝"), HISTORY("History", "📜"), SETUP("Setup", "⚙️")
 }
 
 @Composable
@@ -91,6 +92,8 @@ fun App(openTxn: Long?, onTxnHandled: () -> Unit, resumeTick: Int) {
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     var month by rememberSaveable { mutableStateOf(YearMonth.now()) }
     var showAdd by remember { mutableStateOf(false) }
+    var showAddDue by remember { mutableStateOf(false) }
+    var dueKind by rememberSaveable { mutableStateOf(DueKind.LENT) }
 
     LaunchedEffect(openTxn) { if (openTxn != null) tab = Tab.REVIEW }
 
@@ -120,13 +123,16 @@ fun App(openTxn: Long?, onTxnHandled: () -> Unit, resumeTick: Int) {
         floatingActionButton = {
             if (tab == Tab.HOME || tab == Tab.HISTORY) {
                 FloatingActionButton(onClick = { showAdd = true }) { Text("+", fontSize = 26.sp) }
+            } else if (tab == Tab.DUES) {
+                FloatingActionButton(onClick = { showAddDue = true }) { Text("+", fontSize = 26.sp) }
             }
         },
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (tab) {
-                Tab.HOME -> HomeScreen(month, { month = it }, version, pendingCount) { tab = Tab.REVIEW }
+                Tab.HOME -> HomeScreen(month, { month = it }, version, pendingCount, { tab = Tab.REVIEW }, { tab = Tab.DUES })
                 Tab.REVIEW -> ReviewScreen(openTxn, onTxnHandled, version)
+                Tab.DUES -> DuesScreen(dueKind, { dueKind = it }, version)
                 Tab.HISTORY -> HistoryScreen(month, { month = it }, version)
                 Tab.SETUP -> SetupScreen(resumeTick)
             }
@@ -134,6 +140,7 @@ fun App(openTxn: Long?, onTxnHandled: () -> Unit, resumeTick: Int) {
     }
 
     if (showAdd) AddExpenseDialog(onDismiss = { showAdd = false })
+    if (showAddDue) DueDialog(defaultKind = dueKind, onDismiss = { showAddDue = false })
 }
 
 @Composable

@@ -9,6 +9,10 @@ Kharcha picks up your payments on its own and only asks you one thing: **what wa
 - It **remembers** your choice per shop, so the next Swiggy payment is pre-filled. You can switch on *Auto-file* to skip the question for shops you've sorted before.
 - Categories: Food, Online Orders, Groceries, Investment, EMI & Loans, Bills & Recharge, Travel & Fuel, Entertainment, Health, Shopping, Friends & Family, Other.
 - Monthly total and breakdown by category, history with filters, and manual entry for cash.
+- **Dues tab**: track money people owe you.
+  - 🤝 *Lent to people*: who you lent to and how much is still pending. When you pay a friend on GPay, tap **I lent this** in Review to move it here instead of counting it as spending.
+  - 💼 *Freelance projects*: project, client, total fee, advance, and each payment as it arrives. Shows what's still pending.
+  - Log part-payments; an entry closes itself once fully paid.
 - **Private**: the app has no internet permission, so your data stays on your phone.
 
 ## Install on your phone

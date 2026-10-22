@@ -32,13 +32,35 @@ data class Txn(
     val status: Status,
 )
 
+enum class DueKind(val label: String, val emoji: String) {
+    LENT("Lent to people", "🤝"),
+    FREELANCE("Freelance projects", "💼"),
+}
+
+/** Money someone owes you: a loan to a friend, or a freelance project fee. */
+data class Due(
+    val id: Long,
+    val kind: DueKind,
+    val name: String,
+    val client: String,
+    val totalPaise: Long,
+    val receivedPaise: Long,
+    val note: String,
+    val createdAt: Long,
+    val settled: Boolean,
+) {
+    val pendingPaise: Long get() = (totalPaise - receivedPaise).coerceAtLeast(0)
+}
+
+data class DuePayment(val id: Long, val amountPaise: Long, val timestamp: Long, val note: String)
+
 /** Result of saving an incoming payment. */
 sealed class InsertResult {
     data class New(val txn: Txn) : InsertResult()
     data object Duplicate : InsertResult()
 }
 
-private class Db(context: Context) : SQLiteOpenHelper(context, "kharcha.db", null, 1) {
+private class Db(context: Context) : SQLiteOpenHelper(context, "kharcha.db", null, 2) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             """CREATE TABLE txn(
@@ -59,9 +81,36 @@ private class Db(context: Context) : SQLiteOpenHelper(context, "kharcha.db", nul
         )
         db.execSQL("CREATE INDEX txn_ts ON txn(ts)")
         db.execSQL("CREATE TABLE rule(merchant_key TEXT PRIMARY KEY, category TEXT NOT NULL)")
+        createDueTables(db)
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        // Existing expenses are kept; new tables are only added.
+        if (oldVersion < 2) createDueTables(db)
+    }
+
+    private fun createDueTables(db: SQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE due(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT NOT NULL,
+                name TEXT NOT NULL,
+                client TEXT NOT NULL DEFAULT '',
+                total INTEGER NOT NULL,
+                note TEXT NOT NULL DEFAULT '',
+                created INTEGER NOT NULL,
+                settled INTEGER NOT NULL DEFAULT 0)"""
+        )
+        db.execSQL(
+            """CREATE TABLE due_payment(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                due_id INTEGER NOT NULL,
+                amount INTEGER NOT NULL,
+                ts INTEGER NOT NULL,
+                note TEXT NOT NULL DEFAULT '')"""
+        )
+        db.execSQL("CREATE INDEX due_payment_due ON due_payment(due_id)")
+    }
 }
 
 /** Single place that reads and writes expenses. Every write bumps [changes] so open screens refresh. */
@@ -225,6 +274,126 @@ object Repository {
         return db.readableDatabase
             .rawQuery("SELECT category FROM rule WHERE merchant_key=?", arrayOf(key))
             .use { if (it.moveToFirst()) Category.fromName(it.getString(0)) else null }
+    }
+
+    // ---- Money owed to you: loans to people and pending freelance payments ----
+
+    fun dues(): List<Due> = db.readableDatabase.rawQuery(
+        """SELECT d.*, COALESCE((SELECT SUM(p.amount) FROM due_payment p WHERE p.due_id = d.id), 0) AS received
+           FROM due d ORDER BY d.settled ASC, d.created DESC""",
+        null,
+    ).use { c ->
+        buildList {
+            while (c.moveToNext()) {
+                add(
+                    Due(
+                        id = c.getLong(c.getColumnIndexOrThrow("id")),
+                        kind = DueKind.valueOf(c.str("kind")!!),
+                        name = c.str("name") ?: "",
+                        client = c.str("client") ?: "",
+                        totalPaise = c.getLong(c.getColumnIndexOrThrow("total")),
+                        receivedPaise = c.getLong(c.getColumnIndexOrThrow("received")),
+                        note = c.str("note") ?: "",
+                        createdAt = c.getLong(c.getColumnIndexOrThrow("created")),
+                        settled = c.getInt(c.getColumnIndexOrThrow("settled")) != 0,
+                    )
+                )
+            }
+        }
+    }
+
+    fun duePayments(dueId: Long): List<DuePayment> = db.readableDatabase.query(
+        "due_payment", null, "due_id=?", arrayOf(dueId.toString()), null, null, "ts DESC",
+    ).use { c ->
+        buildList {
+            while (c.moveToNext()) {
+                add(
+                    DuePayment(
+                        id = c.getLong(c.getColumnIndexOrThrow("id")),
+                        amountPaise = c.getLong(c.getColumnIndexOrThrow("amount")),
+                        timestamp = c.getLong(c.getColumnIndexOrThrow("ts")),
+                        note = c.str("note") ?: "",
+                    )
+                )
+            }
+        }
+    }
+
+    fun addDue(
+        kind: DueKind, name: String, client: String, totalPaise: Long, note: String,
+        alreadyReceivedPaise: Long = 0, createdAt: Long = System.currentTimeMillis(),
+    ): Long {
+        val cv = ContentValues().apply {
+            put("kind", kind.name)
+            put("name", name.trim())
+            put("client", client.trim())
+            put("total", totalPaise)
+            put("note", note.trim())
+            put("created", createdAt)
+        }
+        val id = db.writableDatabase.insert("due", null, cv)
+        if (alreadyReceivedPaise > 0) recordDuePayment(id, alreadyReceivedPaise, "Received before adding") else bump()
+        return id
+    }
+
+    fun updateDue(id: Long, name: String, client: String, totalPaise: Long, note: String) {
+        val cv = ContentValues().apply {
+            put("name", name.trim())
+            put("client", client.trim())
+            put("total", totalPaise)
+            put("note", note.trim())
+        }
+        db.writableDatabase.update("due", cv, "id=?", arrayOf(id.toString()))
+        refreshSettled(id)
+        bump()
+    }
+
+    /** Logs money you got back. The entry closes itself once everything is paid. */
+    fun recordDuePayment(dueId: Long, amountPaise: Long, note: String = "", ts: Long = System.currentTimeMillis()) {
+        val cv = ContentValues().apply {
+            put("due_id", dueId)
+            put("amount", amountPaise)
+            put("ts", ts)
+            put("note", note.trim())
+        }
+        db.writableDatabase.insert("due_payment", null, cv)
+        refreshSettled(dueId, allowReopen = false)
+        bump()
+    }
+
+    fun deleteDuePayment(paymentId: Long, dueId: Long) {
+        db.writableDatabase.delete("due_payment", "id=?", arrayOf(paymentId.toString()))
+        refreshSettled(dueId)
+        bump()
+    }
+
+    fun setDueSettled(id: Long, settled: Boolean) {
+        val cv = ContentValues().apply { put("settled", if (settled) 1 else 0) }
+        db.writableDatabase.update("due", cv, "id=?", arrayOf(id.toString()))
+        bump()
+    }
+
+    fun deleteDue(id: Long) {
+        db.writableDatabase.delete("due_payment", "due_id=?", arrayOf(id.toString()))
+        db.writableDatabase.delete("due", "id=?", arrayOf(id.toString()))
+        bump()
+    }
+
+    /** Turns a pending payment (e.g. GPay to a friend) into money lent, so it no longer counts as spending. */
+    fun lendFromTxn(txnId: Long, personName: String) {
+        val t = get(txnId) ?: return
+        val name = personName.ifBlank { t.merchant.takeIf { it != UNKNOWN } ?: t.vpa ?: "Someone" }
+        addDue(DueKind.LENT, name, "", t.amountPaise, "", createdAt = t.timestamp)
+        ignore(txnId)
+    }
+
+    private fun refreshSettled(dueId: Long, allowReopen: Boolean = true) {
+        val d = dues().firstOrNull { it.id == dueId } ?: return
+        val shouldBeSettled = d.receivedPaise >= d.totalPaise
+        if (shouldBeSettled != d.settled && (shouldBeSettled || allowReopen)) {
+            val cv = ContentValues().apply { put("settled", if (shouldBeSettled) 1 else 0) }
+            db.writableDatabase.update("due", cv, "id=?", arrayOf(dueId.toString()))
+        }
     }
 
     // ---- Helpers ----

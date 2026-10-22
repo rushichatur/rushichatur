@@ -129,6 +129,8 @@ class ParserTest {
         assertEquals("₹999", Money.format(99900))
         assertEquals("₹1,000.50", Money.format(100050))
         assertEquals("₹0", Money.format(0))
+        assertEquals("1500", Money.plain(150000))
+        assertEquals("1500.05", Money.plain(150005))
     }
 
     @Test fun merchantKey() {

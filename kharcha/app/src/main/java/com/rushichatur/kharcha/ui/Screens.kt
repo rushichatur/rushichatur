@@ -96,7 +96,11 @@ fun HomeScreen(
     version: Int,
     pendingCount: Int,
     goReview: () -> Unit,
+    goDues: () -> Unit,
 ) {
+    val owedToYou by produceState(0L, version) {
+        value = withContext(Dispatchers.IO) { Repository.dues().filter { !it.settled }.sumOf { it.pendingPaise } }
+    }
     val txns by produceState(emptyList<Txn>(), month, version) {
         value = withContext(Dispatchers.IO) { Repository.confirmedBetween(month.startMillis(), month.endMillis()) }
     }
@@ -130,6 +134,18 @@ fun HomeScreen(
                             "$pendingCount payment${if (pendingCount == 1) "" else "s"} waiting for a category. Tap to sort.",
                             Modifier.weight(1f),
                         )
+                    }
+                }
+            }
+        }
+        if (owedToYou > 0) {
+            item {
+                Card(Modifier.fillMaxWidth().clickable(onClick = goDues)) {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("🤝", fontSize = 24.sp)
+                        Spacer(Modifier.width(12.dp))
+                        Text("People owe you", Modifier.weight(1f))
+                        Text(Money.format(owedToYou), fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -252,20 +268,25 @@ private fun ReviewCard(txn: Txn, highlighted: Boolean) {
                 modifier = Modifier.fillMaxWidth(),
             )
             CategoryChips(selected) { selected = it }
+            Button(
+                enabled = selected != null,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    val c = selected ?: return@Button
+                    scope.launch(Dispatchers.IO) { Repository.confirm(txn.id, c, note) }
+                    Notifier.cancel(context, txn.id)
+                },
+            ) { Text("Save") }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = {
                     scope.launch(Dispatchers.IO) { Repository.ignore(txn.id) }
                     Notifier.cancel(context, txn.id)
                 }) { Text("Not an expense") }
                 Spacer(Modifier.weight(1f))
-                Button(
-                    enabled = selected != null,
-                    onClick = {
-                        val c = selected ?: return@Button
-                        scope.launch(Dispatchers.IO) { Repository.confirm(txn.id, c, note) }
-                        Notifier.cancel(context, txn.id)
-                    },
-                ) { Text("Save") }
+                TextButton(onClick = {
+                    scope.launch(Dispatchers.IO) { Repository.lendFromTxn(txn.id, note) }
+                    Notifier.cancel(context, txn.id)
+                }) { Text("🤝 I lent this") }
             }
         }
     }
