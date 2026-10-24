@@ -2,6 +2,8 @@ package com.rushichatur.kharcha.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,7 +13,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -34,7 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rushichatur.kharcha.core.Money
@@ -45,6 +45,60 @@ import com.rushichatur.kharcha.data.Repository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** Wording that changes with the kind of due. */
+private object DueText {
+    fun settleButton(k: DueKind) = when (k) {
+        DueKind.LENT -> "Got money"
+        DueKind.FREELANCE -> "Got paid"
+        DueKind.BORROWED -> "Paid back"
+    }
+
+    fun progress(d: Due) = when (d.kind) {
+        DueKind.BORROWED -> "Repaid ${Money.format(d.receivedPaise)} of ${Money.format(d.totalPaise)}"
+        else -> "Received ${Money.format(d.receivedPaise)} of ${Money.format(d.totalPaise)}"
+    }
+
+    fun pendingLabel(k: DueKind) = if (k == DueKind.BORROWED) "you owe" else "pending"
+
+    fun paymentTitle(d: Due) = when (d.kind) {
+        DueKind.LENT -> "Money back from ${d.name}"
+        DueKind.FREELANCE -> "Payment for ${d.name}"
+        DueKind.BORROWED -> "Repayment to ${d.name}"
+    }
+
+    fun paymentAmount(k: DueKind) = if (k == DueKind.BORROWED) "Amount you paid back (₹)" else "Amount received (₹)"
+    fun paidSoFar(k: DueKind) = if (k == DueKind.BORROWED) "Paid back so far" else "Received so far"
+
+    fun empty(k: DueKind) = when (k) {
+        DueKind.LENT -> "Nobody owes you money right now.\n\nTap + to note money you lent. Or, when you pay a friend on GPay, tap \"I lent this\" in the Review tab."
+        DueKind.FREELANCE -> "No pending freelance payments.\n\nTap + to add a project with its total fee, then log each payment as it comes in. Payments you log here also count as income."
+        DueKind.BORROWED -> "You don't owe anyone right now.\n\nTap + to note money you took from family or friends, then log each repayment."
+    }
+
+    fun dialogTitle(k: DueKind) = when (k) {
+        DueKind.LENT -> "Money you lent"
+        DueKind.FREELANCE -> "Freelance project"
+        DueKind.BORROWED -> "Money you borrowed"
+    }
+
+    fun nameLabel(k: DueKind) = when (k) {
+        DueKind.LENT -> "Lent to (person's name)"
+        DueKind.FREELANCE -> "Project name"
+        DueKind.BORROWED -> "Borrowed from (e.g. Mom, Rahul)"
+    }
+
+    fun totalLabel(k: DueKind) = when (k) {
+        DueKind.LENT -> "Amount lent (₹)"
+        DueKind.FREELANCE -> "Total project fee (₹)"
+        DueKind.BORROWED -> "Amount borrowed (₹)"
+    }
+
+    fun alreadyLabel(k: DueKind) = when (k) {
+        DueKind.FREELANCE -> "Advance already received (₹, optional)"
+        else -> "Already paid back (₹, optional)"
+    }
+}
 
 @Composable
 fun DuesScreen(kind: DueKind, onKindChange: (DueKind) -> Unit, version: Int) {
@@ -58,6 +112,7 @@ fun DuesScreen(kind: DueKind, onKindChange: (DueKind) -> Unit, version: Int) {
     val open = dues.filter { !it.settled }
     val lentPending = open.filter { it.kind == DueKind.LENT }.sumOf { it.pendingPaise }
     val freelancePending = open.filter { it.kind == DueKind.FREELANCE }.sumOf { it.pendingPaise }
+    val youOwe = open.filter { it.kind == DueKind.BORROWED }.sumOf { it.pendingPaise }
     val openOfKind = open.filter { it.kind == kind }
     val settledOfKind = dues.filter { it.settled && it.kind == kind }
 
@@ -65,20 +120,22 @@ fun DuesScreen(kind: DueKind, onKindChange: (DueKind) -> Unit, version: Int) {
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { Text("Money owed to you", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
+        item { Text("Dues", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
         item {
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                 Column(Modifier.padding(20.dp)) {
-                    Text("Still to receive", style = MaterialTheme.typography.labelLarge)
-                    Text(Money.format(lentPending + freelancePending), fontSize = 36.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.padding(top = 4.dp))
+                    Text("You'll receive", style = MaterialTheme.typography.labelLarge)
+                    Text(Money.format(lentPending + freelancePending), fontSize = 32.sp, fontWeight = FontWeight.Bold)
                     Text("🤝 From people: ${Money.format(lentPending)}")
                     Text("💼 From freelance: ${Money.format(freelancePending)}")
+                    HorizontalDivider(Modifier.padding(vertical = 10.dp))
+                    Text("You owe", style = MaterialTheme.typography.labelLarge)
+                    Text("🙏 ${Money.format(youOwe)}", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 DueKind.entries.forEach { k ->
                     FilterChip(selected = kind == k, onClick = { onKindChange(k) }, label = { Text("${k.emoji} ${k.label}") })
                 }
@@ -87,11 +144,7 @@ fun DuesScreen(kind: DueKind, onKindChange: (DueKind) -> Unit, version: Int) {
         if (openOfKind.isEmpty()) {
             item {
                 Text(
-                    if (kind == DueKind.LENT) {
-                        "Nobody owes you money right now.\n\nTap + to note money you lent. Or, when you pay a friend on GPay, tap \"I lent this\" in the Review tab."
-                    } else {
-                        "No pending freelance payments.\n\nTap + to add a project with its total fee, then log each payment as it comes in."
-                    },
+                    DueText.empty(kind),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp),
                 )
@@ -112,7 +165,7 @@ fun DuesScreen(kind: DueKind, onKindChange: (DueKind) -> Unit, version: Int) {
     }
 
     paying?.let { d -> RecordPaymentDialog(d) { paying = null } }
-    editing?.let { d -> DueDialog(defaultKind = d.kind, existing = d) { editing = null } }
+    editing?.let { d -> DueDialog(defaultKind = d.kind, defaultTs = d.createdAt, existing = d) { editing = null } }
 }
 
 @Composable
@@ -131,8 +184,13 @@ private fun DueCard(d: Due, onPay: () -> Unit, onEdit: () -> Unit) {
                     if (d.settled) {
                         Text("✅ Settled", fontWeight = FontWeight.SemiBold)
                     } else {
-                        Text(Money.format(d.pendingPaise), fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Text("pending", style = MaterialTheme.typography.bodySmall, color = muted)
+                        Text(
+                            Money.format(d.pendingPaise),
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (d.kind == DueKind.BORROWED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(DueText.pendingLabel(d.kind), style = MaterialTheme.typography.bodySmall, color = muted)
                     }
                 }
             }
@@ -140,10 +198,7 @@ private fun DueCard(d: Due, onPay: () -> Unit, onEdit: () -> Unit) {
                 progress = { if (d.totalPaise == 0L) 1f else (d.receivedPaise.toFloat() / d.totalPaise).coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth(),
             )
-            Text(
-                "Received ${Money.format(d.receivedPaise)} of ${Money.format(d.totalPaise)}",
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Text(DueText.progress(d), style = MaterialTheme.typography.bodySmall)
             if (d.note.isNotBlank()) Text(d.note, style = MaterialTheme.typography.bodySmall, color = muted)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onEdit) { Text("Edit") }
@@ -153,18 +208,17 @@ private fun DueCard(d: Due, onPay: () -> Unit, onEdit: () -> Unit) {
                     TextButton(onClick = { scope.launch(Dispatchers.IO) { Repository.setDueSettled(d.id, true) } }) { Text("Mark settled") }
                 }
                 Spacer(Modifier.weight(1f))
-                FilledTonalButton(onClick = onPay) { Text(if (d.kind == DueKind.LENT) "Got money" else "Got paid") }
+                FilledTonalButton(onClick = onPay) { Text(DueText.settleButton(d.kind)) }
             }
         }
     }
 }
 
-private fun String.amountInput() = filter { it.isDigit() || it == '.' }
-
 @Composable
 private fun RecordPaymentDialog(d: Due, onDismiss: () -> Unit) {
     var amount by remember { mutableStateOf(if (d.pendingPaise > 0) Money.plain(d.pendingPaise) else "") }
     var note by remember { mutableStateOf("") }
+    var ts by remember { mutableStateOf(System.currentTimeMillis()) }
     val scope = rememberCoroutineScope()
     val history by produceState(emptyList<DuePayment>(), d.id, d.receivedPaise) {
         value = withContext(Dispatchers.IO) { Repository.duePayments(d.id) }
@@ -173,18 +227,12 @@ private fun RecordPaymentDialog(d: Due, onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (d.kind == DueKind.LENT) "Money back from ${d.name}" else "Payment for ${d.name}") },
+        title = { Text(DueText.paymentTitle(d)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Pending: ${Money.format(d.pendingPaise)}", fontWeight = FontWeight.SemiBold)
-                OutlinedTextField(
-                    value = amount,
-                    onValueChange = { amount = it.amountInput() },
-                    label = { Text("Amount received (₹)") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                AmountField(amount, { amount = it }, DueText.paymentAmount(d.kind))
+                DateButton(ts) { ts = it }
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
@@ -194,7 +242,7 @@ private fun RecordPaymentDialog(d: Due, onDismiss: () -> Unit) {
                 )
                 if (history.isNotEmpty()) {
                     HorizontalDivider()
-                    Text("Received so far", style = MaterialTheme.typography.labelLarge)
+                    Text(DueText.paidSoFar(d.kind), style = MaterialTheme.typography.labelLarge)
                     history.forEach { p ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
@@ -212,7 +260,7 @@ private fun RecordPaymentDialog(d: Due, onDismiss: () -> Unit) {
         confirmButton = {
             TextButton(enabled = paise != null, onClick = {
                 val p = paise ?: return@TextButton
-                scope.launch(Dispatchers.IO) { Repository.recordDuePayment(d.id, p, note) }
+                scope.launch(Dispatchers.IO) { Repository.recordDuePayment(d.id, p, note, ts) }
                 onDismiss()
             }) { Text("Save") }
         },
@@ -220,48 +268,43 @@ private fun RecordPaymentDialog(d: Due, onDismiss: () -> Unit) {
     )
 }
 
-/** Add a new loan / project, or edit an existing one. */
+/** Add a new loan / project / borrowing, or edit an existing one. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun DueDialog(defaultKind: DueKind, existing: Due? = null, onDismiss: () -> Unit) {
+fun DueDialog(defaultKind: DueKind, defaultTs: Long, existing: Due? = null, onDismiss: () -> Unit) {
     var kind by remember { mutableStateOf(existing?.kind ?: defaultKind) }
     var name by remember { mutableStateOf(existing?.name ?: "") }
     var client by remember { mutableStateOf(existing?.client ?: "") }
     var total by remember { mutableStateOf(existing?.let { Money.plain(it.totalPaise) } ?: "") }
     var received by remember { mutableStateOf("") }
     var note by remember { mutableStateOf(existing?.note ?: "") }
+    var ts by remember { mutableStateOf(defaultTs) }
     var confirmDelete by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val totalPaise = Money.parsePaise(total)
     val receivedPaise = Money.parsePaise(received) ?: 0L
-    val lent = kind == DueKind.LENT
+    val freelance = kind == DueKind.FREELANCE
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text(
-                when {
-                    existing != null -> "Edit"
-                    lent -> "Money you lent"
-                    else -> "Freelance project"
-                }
-            )
-        },
+        title = { Text(if (existing != null) "Edit" else DueText.dialogTitle(kind)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (existing == null) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        FilterChip(selected = lent, onClick = { kind = DueKind.LENT }, label = { Text("🤝 Lent") })
-                        FilterChip(selected = !lent, onClick = { kind = DueKind.FREELANCE }, label = { Text("💼 Freelance") })
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        DueKind.entries.forEach { k ->
+                            FilterChip(selected = kind == k, onClick = { kind = k }, label = { Text("${k.emoji} ${k.label}") })
+                        }
                     }
                 }
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text(if (lent) "Person's name" else "Project name") },
+                    label = { Text(DueText.nameLabel(kind)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                if (!lent) {
+                if (freelance) {
                     OutlinedTextField(
                         value = client,
                         onValueChange = { client = it },
@@ -270,23 +313,10 @@ fun DueDialog(defaultKind: DueKind, existing: Due? = null, onDismiss: () -> Unit
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                OutlinedTextField(
-                    value = total,
-                    onValueChange = { total = it.amountInput() },
-                    label = { Text(if (lent) "Amount lent (₹)" else "Total project fee (₹)") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                AmountField(total, { total = it }, DueText.totalLabel(kind))
                 if (existing == null) {
-                    OutlinedTextField(
-                        value = received,
-                        onValueChange = { received = it.amountInput() },
-                        label = { Text(if (lent) "Already paid back (₹, optional)" else "Advance already received (₹, optional)") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    AmountField(received, { received = it }, DueText.alreadyLabel(kind))
+                    DateButton(ts) { ts = it }
                 }
                 OutlinedTextField(
                     value = note,
@@ -311,11 +341,12 @@ fun DueDialog(defaultKind: DueKind, existing: Due? = null, onDismiss: () -> Unit
         confirmButton = {
             TextButton(enabled = name.isNotBlank() && totalPaise != null, onClick = {
                 val t = totalPaise ?: return@TextButton
+                val c = if (freelance) client else ""
                 scope.launch(Dispatchers.IO) {
                     if (existing == null) {
-                        Repository.addDue(kind, name, if (lent) "" else client, t, note, alreadyReceivedPaise = receivedPaise)
+                        Repository.addDue(kind, name, c, t, note, alreadyReceivedPaise = receivedPaise, createdAt = ts)
                     } else {
-                        Repository.updateDue(existing.id, name, if (lent) "" else client, t, note)
+                        Repository.updateDue(existing.id, name, c, t, note)
                     }
                 }
                 onDismiss()

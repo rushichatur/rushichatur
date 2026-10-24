@@ -11,6 +11,18 @@ object Money {
         return value.movePointRight(2).toLong()
     }
 
+    /** 150000 -> "+₹1,500", -30000 -> "-₹300". */
+    fun signed(paise: Long): String = if (paise >= 0) "+" + format(paise) else format(paise)
+
+    /** Gain as a percentage of what was put in: (1200, 10000) -> "+12.0%". Null when nothing was invested. */
+    fun percent(gainPaise: Long, basePaise: Long): String? {
+        if (basePaise <= 0) return null
+        val tenths = Math.round(gainPaise * 1000.0 / basePaise)
+        val sign = if (tenths >= 0) "+" else "-"
+        val abs = kotlin.math.abs(tenths)
+        return "$sign${abs / 10}.${abs % 10}%"
+    }
+
     /** 12345650 paise -> "123456.50" (for pre-filling input boxes). */
     fun plain(paise: Long): String {
         val r = paise / 100

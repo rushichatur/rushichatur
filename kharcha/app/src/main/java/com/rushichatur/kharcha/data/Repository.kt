@@ -30,14 +30,59 @@ data class Txn(
     val ref: String?,
     val raw: String?,
     val status: Status,
+    val holdingId: Long?,
 )
 
 enum class DueKind(val label: String, val emoji: String) {
-    LENT("Lent to people", "🤝"),
-    FREELANCE("Freelance projects", "💼"),
+    LENT("Lent", "🤝"),
+    FREELANCE("Freelance", "💼"),
+    BORROWED("Borrowed", "🙏");
+
+    /** True when the money comes to you; false for money you borrowed and must repay. */
+    val owedToYou: Boolean get() = this != BORROWED
 }
 
-/** Money someone owes you: a loan to a friend, or a freelance project fee. */
+enum class IncomeKind(val label: String, val emoji: String) {
+    SALARY("Salary", "💰"),
+    FREELANCE("Freelance", "💼"),
+    INTEREST("Interest & dividends", "🏦"),
+    GIFT("Gift", "🎁"),
+    OTHER("Other", "➕"),
+}
+
+data class Income(
+    val id: Long,
+    val kind: IncomeKind,
+    val source: String,
+    val amountPaise: Long,
+    val timestamp: Long,
+    val note: String,
+    /** Set when this income came from logging a freelance payment in Dues. */
+    val duePaymentId: Long?,
+)
+
+enum class HoldingKind(val label: String, val emoji: String) {
+    MUTUAL_FUND("Mutual funds", "📊"),
+    STOCK("Stocks", "📈"),
+    OTHER("Other (FD, gold, PPF…)", "🪙"),
+}
+
+/** One mutual fund, stock, FD etc. Invested = what you had before adding it + every payment linked to it. */
+data class Holding(
+    val id: Long,
+    val kind: HoldingKind,
+    val name: String,
+    val openingPaise: Long,
+    val addedPaise: Long,
+    val valuePaise: Long,
+    val valueUpdatedAt: Long,
+    val createdAt: Long,
+) {
+    val investedPaise: Long get() = openingPaise + addedPaise
+    val gainPaise: Long get() = valuePaise - investedPaise
+}
+
+/** Money owed between you and someone: a loan either way, or a freelance project fee. */
 data class Due(
     val id: Long,
     val kind: DueKind,
@@ -60,7 +105,7 @@ sealed class InsertResult {
     data object Duplicate : InsertResult()
 }
 
-private class Db(context: Context) : SQLiteOpenHelper(context, "kharcha.db", null, 2) {
+private class Db(context: Context) : SQLiteOpenHelper(context, "kharcha.db", null, 3) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             """CREATE TABLE txn(
@@ -77,16 +122,52 @@ private class Db(context: Context) : SQLiteOpenHelper(context, "kharcha.db", nul
                 account TEXT,
                 ref TEXT,
                 raw TEXT,
-                status TEXT NOT NULL)"""
+                status TEXT NOT NULL,
+                holding_id INTEGER)"""
         )
         db.execSQL("CREATE INDEX txn_ts ON txn(ts)")
         db.execSQL("CREATE TABLE rule(merchant_key TEXT PRIMARY KEY, category TEXT NOT NULL)")
         createDueTables(db)
+        createIncomeAndHoldingTables(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // Existing expenses are kept; new tables are only added.
+        // Existing data is always kept; upgrades only add tables and columns.
         if (oldVersion < 2) createDueTables(db)
+        if (oldVersion < 3) {
+            db.execSQL("ALTER TABLE txn ADD COLUMN holding_id INTEGER")
+            createIncomeAndHoldingTables(db)
+            // Freelance payments logged before this version count as income too.
+            db.execSQL(
+                """INSERT INTO income(kind, source, amount, ts, note, due_payment_id)
+                   SELECT 'FREELANCE', d.name, p.amount, p.ts, p.note, p.id
+                   FROM due_payment p JOIN due d ON d.id = p.due_id WHERE d.kind = 'FREELANCE'"""
+            )
+        }
+    }
+
+    private fun createIncomeAndHoldingTables(db: SQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE income(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT NOT NULL,
+                source TEXT NOT NULL,
+                amount INTEGER NOT NULL,
+                ts INTEGER NOT NULL,
+                note TEXT NOT NULL DEFAULT '',
+                due_payment_id INTEGER)"""
+        )
+        db.execSQL("CREATE INDEX income_ts ON income(ts)")
+        db.execSQL(
+            """CREATE TABLE holding(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT NOT NULL,
+                name TEXT NOT NULL,
+                opening INTEGER NOT NULL DEFAULT 0,
+                value INTEGER NOT NULL DEFAULT 0,
+                value_ts INTEGER NOT NULL,
+                created INTEGER NOT NULL)"""
+        )
     }
 
     private fun createDueTables(db: SQLiteDatabase) {
@@ -217,6 +298,7 @@ object Repository {
             if (note != null) put("note", note.trim())
         }
         db.writableDatabase.update("txn", cv, "id=?", arrayOf(id.toString()))
+        if (category != Category.INVESTMENT) setTxnHolding(id, null)
         get(id)?.let { t ->
             if (t.source != Source.MANUAL) {
                 learn(t.merchant.takeIf { it != UNKNOWN }, category)
@@ -233,11 +315,15 @@ object Repository {
     }
 
     fun delete(id: Long) {
+        setTxnHolding(id, null)
         db.writableDatabase.delete("txn", "id=?", arrayOf(id.toString()))
         bump()
     }
 
-    fun addManual(amountPaise: Long, what: String, category: Category, timestamp: Long = System.currentTimeMillis()) {
+    fun addManual(
+        amountPaise: Long, what: String, category: Category,
+        timestamp: Long = System.currentTimeMillis(), holdingId: Long? = null,
+    ) {
         val cv = ContentValues().apply {
             put("amount", amountPaise)
             put("merchant", what.ifBlank { category.label })
@@ -247,7 +333,8 @@ object Repository {
             put("source", Source.MANUAL.name)
             put("status", Status.CONFIRMED.name)
         }
-        db.writableDatabase.insert("txn", null, cv)
+        val id = db.writableDatabase.insert("txn", null, cv)
+        if (holdingId != null) setTxnHolding(id, holdingId)
         bump()
     }
 
@@ -332,7 +419,11 @@ object Repository {
             put("created", createdAt)
         }
         val id = db.writableDatabase.insert("due", null, cv)
-        if (alreadyReceivedPaise > 0) recordDuePayment(id, alreadyReceivedPaise, "Received before adding") else bump()
+        if (alreadyReceivedPaise > 0) {
+            recordDuePayment(id, alreadyReceivedPaise, if (kind == DueKind.FREELANCE) "Advance" else "Paid before adding", createdAt)
+        } else {
+            bump()
+        }
         return id
     }
 
@@ -356,12 +447,17 @@ object Repository {
             put("ts", ts)
             put("note", note.trim())
         }
-        db.writableDatabase.insert("due_payment", null, cv)
+        val paymentId = db.writableDatabase.insert("due_payment", null, cv)
+        val due = dues().firstOrNull { it.id == dueId }
+        if (due?.kind == DueKind.FREELANCE) {
+            addIncome(IncomeKind.FREELANCE, due.name, amountPaise, ts, note, duePaymentId = paymentId)
+        }
         refreshSettled(dueId, allowReopen = false)
         bump()
     }
 
     fun deleteDuePayment(paymentId: Long, dueId: Long) {
+        db.writableDatabase.delete("income", "due_payment_id=?", arrayOf(paymentId.toString()))
         db.writableDatabase.delete("due_payment", "id=?", arrayOf(paymentId.toString()))
         refreshSettled(dueId)
         bump()
@@ -374,6 +470,9 @@ object Repository {
     }
 
     fun deleteDue(id: Long) {
+        db.writableDatabase.delete(
+            "income", "due_payment_id IN (SELECT id FROM due_payment WHERE due_id=?)", arrayOf(id.toString()),
+        )
         db.writableDatabase.delete("due_payment", "due_id=?", arrayOf(id.toString()))
         db.writableDatabase.delete("due", "id=?", arrayOf(id.toString()))
         bump()
@@ -394,6 +493,150 @@ object Repository {
             val cv = ContentValues().apply { put("settled", if (shouldBeSettled) 1 else 0) }
             db.writableDatabase.update("due", cv, "id=?", arrayOf(dueId.toString()))
         }
+    }
+
+    // ---- Income ----
+
+    fun incomeBetween(from: Long, to: Long): List<Income> = db.readableDatabase.query(
+        "income", null, "ts>=? AND ts<?", arrayOf(from.toString(), to.toString()), null, null, "ts DESC",
+    ).use { c ->
+        buildList {
+            while (c.moveToNext()) {
+                add(
+                    Income(
+                        id = c.getLong(c.getColumnIndexOrThrow("id")),
+                        kind = IncomeKind.valueOf(c.str("kind")!!),
+                        source = c.str("source") ?: "",
+                        amountPaise = c.getLong(c.getColumnIndexOrThrow("amount")),
+                        timestamp = c.getLong(c.getColumnIndexOrThrow("ts")),
+                        note = c.str("note") ?: "",
+                        duePaymentId = c.str("due_payment_id")?.toLongOrNull(),
+                    )
+                )
+            }
+        }
+    }
+
+    fun addIncome(
+        kind: IncomeKind, source: String, amountPaise: Long, ts: Long, note: String, duePaymentId: Long? = null,
+    ) {
+        val cv = ContentValues().apply {
+            put("kind", kind.name)
+            put("source", source.trim().ifBlank { kind.label })
+            put("amount", amountPaise)
+            put("ts", ts)
+            put("note", note.trim())
+            put("due_payment_id", duePaymentId)
+        }
+        db.writableDatabase.insert("income", null, cv)
+        bump()
+    }
+
+    fun updateIncome(id: Long, kind: IncomeKind, source: String, amountPaise: Long, ts: Long, note: String) {
+        val cv = ContentValues().apply {
+            put("kind", kind.name)
+            put("source", source.trim().ifBlank { kind.label })
+            put("amount", amountPaise)
+            put("ts", ts)
+            put("note", note.trim())
+        }
+        db.writableDatabase.update("income", cv, "id=?", arrayOf(id.toString()))
+        bump()
+    }
+
+    fun deleteIncome(id: Long) {
+        db.writableDatabase.delete("income", "id=?", arrayOf(id.toString()))
+        bump()
+    }
+
+    // ---- Investments: mutual funds, stocks and others ----
+
+    fun holdings(): List<Holding> = db.readableDatabase.rawQuery(
+        """SELECT h.*, COALESCE((SELECT SUM(t.amount) FROM txn t
+                                 WHERE t.holding_id = h.id AND t.status = 'CONFIRMED'), 0) AS added
+           FROM holding h ORDER BY h.kind, h.name COLLATE NOCASE""",
+        null,
+    ).use { c ->
+        buildList {
+            while (c.moveToNext()) {
+                add(
+                    Holding(
+                        id = c.getLong(c.getColumnIndexOrThrow("id")),
+                        kind = HoldingKind.valueOf(c.str("kind")!!),
+                        name = c.str("name") ?: "",
+                        openingPaise = c.getLong(c.getColumnIndexOrThrow("opening")),
+                        addedPaise = c.getLong(c.getColumnIndexOrThrow("added")),
+                        valuePaise = c.getLong(c.getColumnIndexOrThrow("value")),
+                        valueUpdatedAt = c.getLong(c.getColumnIndexOrThrow("value_ts")),
+                        createdAt = c.getLong(c.getColumnIndexOrThrow("created")),
+                    )
+                )
+            }
+        }
+    }
+
+    /** [openingPaise] is what you had invested before you started using Kharcha. */
+    fun addHolding(kind: HoldingKind, name: String, openingPaise: Long, valuePaise: Long?) {
+        val now = System.currentTimeMillis()
+        val cv = ContentValues().apply {
+            put("kind", kind.name)
+            put("name", name.trim())
+            put("opening", openingPaise)
+            put("value", valuePaise ?: openingPaise)
+            put("value_ts", now)
+            put("created", now)
+        }
+        db.writableDatabase.insert("holding", null, cv)
+        bump()
+    }
+
+    fun updateHolding(id: Long, kind: HoldingKind, name: String, openingPaise: Long) {
+        val cv = ContentValues().apply {
+            put("kind", kind.name)
+            put("name", name.trim())
+            put("opening", openingPaise)
+        }
+        db.writableDatabase.update("holding", cv, "id=?", arrayOf(id.toString()))
+        bump()
+    }
+
+    fun updateHoldingValue(id: Long, valuePaise: Long) {
+        val cv = ContentValues().apply {
+            put("value", valuePaise)
+            put("value_ts", System.currentTimeMillis())
+        }
+        db.writableDatabase.update("holding", cv, "id=?", arrayOf(id.toString()))
+        bump()
+    }
+
+    /** Removes the holding. Linked payments stay in your expenses as Investment. */
+    fun deleteHolding(id: Long) {
+        val cv = ContentValues().apply { putNull("holding_id") }
+        db.writableDatabase.update("txn", cv, "holding_id=?", arrayOf(id.toString()))
+        db.writableDatabase.delete("holding", "id=?", arrayOf(id.toString()))
+        bump()
+    }
+
+    /** Adds money to a fund/stock: saved as an Investment expense for the month and added to its value. */
+    fun investInHolding(holdingId: Long, amountPaise: Long, ts: Long) {
+        val h = holdings().firstOrNull { it.id == holdingId } ?: return
+        addManual(amountPaise, h.name, Category.INVESTMENT, ts, holdingId)
+    }
+
+    /** Links a payment to a holding (or unlinks with null) and moves its amount into that holding's value. */
+    fun setTxnHolding(txnId: Long, holdingId: Long?) {
+        val t = get(txnId) ?: return
+        if (t.holdingId == holdingId) return
+        val w = db.writableDatabase
+        if (t.holdingId != null) {
+            w.execSQL("UPDATE holding SET value = MAX(0, value - ?) WHERE id = ?", arrayOf<Any>(t.amountPaise, t.holdingId))
+        }
+        if (holdingId != null) {
+            w.execSQL("UPDATE holding SET value = value + ? WHERE id = ?", arrayOf<Any>(t.amountPaise, holdingId))
+        }
+        val cv = ContentValues().apply { if (holdingId == null) putNull("holding_id") else put("holding_id", holdingId) }
+        w.update("txn", cv, "id=?", arrayOf(txnId.toString()))
+        bump()
     }
 
     // ---- Helpers ----
@@ -422,5 +665,6 @@ object Repository {
         ref = str("ref"),
         raw = str("raw"),
         status = Status.valueOf(str("status")!!),
+        holdingId = str("holding_id")?.toLongOrNull(),
     )
 }

@@ -10,7 +10,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import android.app.DatePickerDialog
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.platform.LocalContext
+import java.time.LocalDate
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -50,6 +54,38 @@ fun Long.dayTimeLabel(): String = toLocal().format(dayTimeFmt)
 fun YearMonth.startMillis() = atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 fun YearMonth.endMillis() = plusMonths(1).startMillis()
 
+/** Default date for something you add while looking at [this] month: now, or the 1st of a past month. */
+fun YearMonth.defaultTs(): Long =
+    if (this == YearMonth.now()) System.currentTimeMillis()
+    else atDay(1).atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+fun Long.inMonth(month: YearMonth) = this >= month.startMillis() && this < month.endMillis()
+
+@Composable
+fun AmountField(value: String, onChange: (String) -> Unit, label: String) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { onChange(it.filter { ch -> ch.isDigit() || ch == '.' }) },
+        label = { Text(label) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+/** A button showing the date; tapping it opens Android's calendar picker. */
+@Composable
+fun DateButton(ts: Long, onChange: (Long) -> Unit) {
+    val context = LocalContext.current
+    OutlinedButton(onClick = {
+        val d = ts.toLocal()
+        DatePickerDialog(context, { _, y, m, day ->
+            val picked = LocalDate.of(y, m + 1, day).atTime(d.toLocalTime()).atZone(ZoneId.systemDefault())
+            onChange(picked.toInstant().toEpochMilli())
+        }, d.year, d.monthValue - 1, d.dayOfMonth).show()
+    }) { Text("📅 " + ts.dayLabel()) }
+}
+
 @Composable
 fun MonthSwitcher(month: YearMonth, onChange: (YearMonth) -> Unit) {
     Row(
@@ -78,7 +114,8 @@ fun CategoryChips(selected: Category?, onSelect: (Category) -> Unit) {
 }
 
 @Composable
-fun AddExpenseDialog(onDismiss: () -> Unit) {
+fun AddExpenseDialog(defaultTs: Long, onDismiss: () -> Unit) {
+    var ts by remember { mutableStateOf(defaultTs) }
     var amount by remember { mutableStateOf("") }
     var what by remember { mutableStateOf("") }
     var category by remember { mutableStateOf<Category?>(null) }
@@ -105,6 +142,7 @@ fun AddExpenseDialog(onDismiss: () -> Unit) {
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                DateButton(ts) { ts = it }
                 CategoryChips(category) { category = it }
             }
         },
@@ -114,7 +152,7 @@ fun AddExpenseDialog(onDismiss: () -> Unit) {
                 onClick = {
                     val p = paise ?: return@TextButton
                     val c = category ?: return@TextButton
-                    scope.launch(Dispatchers.IO) { Repository.addManual(p, what, c) }
+                    scope.launch(Dispatchers.IO) { Repository.addManual(p, what, c, ts) }
                     onDismiss()
                 },
             ) { Text("Save") }

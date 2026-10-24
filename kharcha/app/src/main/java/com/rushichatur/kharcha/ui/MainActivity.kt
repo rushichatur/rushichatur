@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -82,8 +83,14 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-enum class Tab(val label: String, val emoji: String) {
-    HOME("Home", "🏠"), REVIEW("Review", "📝"), DUES("Dues", "🤝"), HISTORY("History", "📜"), SETUP("Setup", "⚙️")
+enum class Tab(val label: String, val emoji: String, val inBottomBar: Boolean = true) {
+    HOME("Home", "🏠"),
+    REVIEW("Review", "📝"),
+    INCOME("Income", "💰"),
+    DUES("Dues", "🤝"),
+    INVEST("Invest", "📈"),
+    HISTORY("History", "📜", inBottomBar = false),
+    SETUP("Setup", "⚙️", inBottomBar = false),
 }
 
 @Composable
@@ -93,9 +100,12 @@ fun App(openTxn: Long?, onTxnHandled: () -> Unit, resumeTick: Int) {
     var month by rememberSaveable { mutableStateOf(YearMonth.now()) }
     var showAdd by remember { mutableStateOf(false) }
     var showAddDue by remember { mutableStateOf(false) }
+    var showAddIncome by remember { mutableStateOf(false) }
+    var showAddHolding by remember { mutableStateOf(false) }
     var dueKind by rememberSaveable { mutableStateOf(DueKind.LENT) }
 
     LaunchedEffect(openTxn) { if (openTxn != null) tab = Tab.REVIEW }
+    BackHandler(enabled = tab != Tab.HOME) { tab = Tab.HOME }
 
     val pendingCount by produceState(0, version) {
         value = withContext(Dispatchers.IO) { Repository.pendingCount() }
@@ -104,7 +114,7 @@ fun App(openTxn: Long?, onTxnHandled: () -> Unit, resumeTick: Int) {
     Scaffold(
         bottomBar = {
             NavigationBar {
-                Tab.entries.forEach { t ->
+                Tab.entries.filter { it.inBottomBar }.forEach { t ->
                     NavigationBarItem(
                         selected = tab == t,
                         onClick = { tab = t },
@@ -121,26 +131,33 @@ fun App(openTxn: Long?, onTxnHandled: () -> Unit, resumeTick: Int) {
             }
         },
         floatingActionButton = {
-            if (tab == Tab.HOME || tab == Tab.HISTORY) {
-                FloatingActionButton(onClick = { showAdd = true }) { Text("+", fontSize = 26.sp) }
-            } else if (tab == Tab.DUES) {
-                FloatingActionButton(onClick = { showAddDue = true }) { Text("+", fontSize = 26.sp) }
+            val onAdd: (() -> Unit)? = when (tab) {
+                Tab.HOME, Tab.HISTORY -> { { showAdd = true } }
+                Tab.INCOME -> { { showAddIncome = true } }
+                Tab.DUES -> { { showAddDue = true } }
+                Tab.INVEST -> { { showAddHolding = true } }
+                else -> null
             }
+            if (onAdd != null) FloatingActionButton(onClick = onAdd) { Text("+", fontSize = 26.sp) }
         },
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (tab) {
-                Tab.HOME -> HomeScreen(month, { month = it }, version, pendingCount, { tab = Tab.REVIEW }, { tab = Tab.DUES })
+                Tab.HOME -> HomeScreen(month, { month = it }, version, pendingCount) { tab = it }
                 Tab.REVIEW -> ReviewScreen(openTxn, onTxnHandled, version)
+                Tab.INCOME -> IncomeScreen(month, { month = it }, version) { dueKind = DueKind.BORROWED; tab = Tab.DUES }
                 Tab.DUES -> DuesScreen(dueKind, { dueKind = it }, version)
+                Tab.INVEST -> InvestScreen(month, { month = it }, version, month.defaultTs())
                 Tab.HISTORY -> HistoryScreen(month, { month = it }, version)
                 Tab.SETUP -> SetupScreen(resumeTick)
             }
         }
     }
 
-    if (showAdd) AddExpenseDialog(onDismiss = { showAdd = false })
-    if (showAddDue) DueDialog(defaultKind = dueKind, onDismiss = { showAddDue = false })
+    if (showAdd) AddExpenseDialog(defaultTs = month.defaultTs(), onDismiss = { showAdd = false })
+    if (showAddDue) DueDialog(defaultKind = dueKind, defaultTs = month.defaultTs(), onDismiss = { showAddDue = false })
+    if (showAddIncome) IncomeDialog(defaultTs = month.defaultTs(), onDismiss = { showAddIncome = false })
+    if (showAddHolding) HoldingDialog(onDismiss = { showAddHolding = false })
 }
 
 @Composable

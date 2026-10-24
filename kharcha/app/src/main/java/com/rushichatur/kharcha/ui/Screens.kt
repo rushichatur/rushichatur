@@ -11,6 +11,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -62,6 +65,8 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.rushichatur.kharcha.core.Category
 import com.rushichatur.kharcha.core.Money
+import com.rushichatur.kharcha.data.Due
+import com.rushichatur.kharcha.data.Holding
 import com.rushichatur.kharcha.data.Repository
 import com.rushichatur.kharcha.data.Settings
 import com.rushichatur.kharcha.data.Source
@@ -95,36 +100,71 @@ fun HomeScreen(
     onMonthChange: (YearMonth) -> Unit,
     version: Int,
     pendingCount: Int,
-    goReview: () -> Unit,
-    goDues: () -> Unit,
+    go: (Tab) -> Unit,
 ) {
-    val owedToYou by produceState(0L, version) {
-        value = withContext(Dispatchers.IO) { Repository.dues().filter { !it.settled }.sumOf { it.pendingPaise } }
+    val m by produceState(MonthMoney(), month, version) {
+        value = withContext(Dispatchers.IO) { MonthMoney.load(month) }
     }
-    val txns by produceState(emptyList<Txn>(), month, version) {
-        value = withContext(Dispatchers.IO) { Repository.confirmedBetween(month.startMillis(), month.endMillis()) }
+    val dues by produceState(emptyList<Due>(), version) {
+        value = withContext(Dispatchers.IO) { Repository.dues().filter { !it.settled } }
     }
-    val total = txns.sumOf { it.amountPaise }
-    val byCategory = txns.groupBy { it.category ?: Category.OTHER }
+    val owedToYou = dues.filter { it.kind.owedToYou }.sumOf { it.pendingPaise }
+    val youOwe = dues.filter { !it.kind.owedToYou }.sumOf { it.pendingPaise }
+    val spending = m.txns.filter { it.category != Category.INVESTMENT }
+    val total = m.spentPaise
+    val byCategory = spending.groupBy { it.category ?: Category.OTHER }
         .mapValues { (_, list) -> list.sumOf { it.amountPaise } }
         .entries.sortedByDescending { it.value }
 
     LazyColumn(contentPadding = screenPadding, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { ScreenTitle("Kharcha") }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Kharcha", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                TextButton(onClick = { go(Tab.HISTORY) }) { Text("📜 History") }
+                TextButton(onClick = { go(Tab.SETUP) }) { Text("⚙️ Setup") }
+            }
+        }
         item { MonthSwitcher(month, onMonthChange) }
         item {
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                 Column(Modifier.padding(20.dp)) {
                     Text("Spent this month", style = MaterialTheme.typography.labelLarge)
                     Text(Money.format(total), fontSize = 36.sp, fontWeight = FontWeight.Bold)
-                    Text("${txns.size} expenses", style = MaterialTheme.typography.bodySmall)
+                    Text("${spending.size} expenses · investments not included", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("This month", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(4.dp))
+                    Box(Modifier.clickable { go(Tab.INCOME) }) { SummaryLine("💰", "Earned", Money.format(m.earnedPaise)) }
+                    if (m.borrowedPaise > 0) {
+                        Box(Modifier.clickable { go(Tab.DUES) }) { SummaryLine("🙏", "Borrowed", Money.format(m.borrowedPaise)) }
+                    }
+                    SummaryLine("🧾", "Spent", "-" + Money.format(m.spentPaise))
+                    Box(Modifier.clickable { go(Tab.INVEST) }) { SummaryLine("📈", "Invested", "-" + Money.format(m.investedPaise)) }
+                    HorizontalDivider(Modifier.padding(vertical = 6.dp))
+                    SummaryLine(
+                        "🏦", "Left over", Money.format(m.leftOverPaise),
+                        color = if (m.leftOverPaise < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        bold = true,
+                    )
+                    if (m.earnedPaise == 0L) {
+                        Text(
+                            "Add your salary in the 💰 Income tab to see what's left over.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
         if (pendingCount > 0) {
             item {
                 Card(
-                    Modifier.fillMaxWidth().clickable(onClick = goReview),
+                    Modifier.fillMaxWidth().clickable { go(Tab.REVIEW) },
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
                 ) {
                     Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -138,30 +178,28 @@ fun HomeScreen(
                 }
             }
         }
-        if (owedToYou > 0) {
+        if (owedToYou > 0 || youOwe > 0) {
             item {
-                Card(Modifier.fillMaxWidth().clickable(onClick = goDues)) {
-                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("🤝", fontSize = 24.sp)
-                        Spacer(Modifier.width(12.dp))
-                        Text("People owe you", Modifier.weight(1f))
-                        Text(Money.format(owedToYou), fontWeight = FontWeight.Bold)
+                Card(Modifier.fillMaxWidth().clickable { go(Tab.DUES) }) {
+                    Column(Modifier.padding(16.dp)) {
+                        if (owedToYou > 0) SummaryLine("🤝", "People owe you", Money.format(owedToYou))
+                        if (youOwe > 0) SummaryLine("🙏", "You owe", Money.format(youOwe), color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
         }
-        if (txns.isEmpty()) {
+        if (spending.isEmpty()) {
             item {
                 Text(
                     "Nothing confirmed for this month yet.\n\nPay with GPay / PhonePe or by card and you'll get a " +
-                        "notification asking what it was for. Open the Setup tab first to give permissions.",
+                        "notification asking what it was for. Open ⚙️ Setup first to give permissions.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 16.dp),
                 )
             }
         } else {
-            item { Text("By category", style = MaterialTheme.typography.titleMedium) }
+            item { Text("Spending by category", style = MaterialTheme.typography.titleMedium) }
             items(byCategory, key = { it.key.name }) { (cat, amount) ->
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -185,6 +223,9 @@ fun HomeScreen(
 fun ReviewScreen(focusId: Long?, onFocusHandled: () -> Unit, version: Int) {
     val pending by produceState<List<Txn>?>(null, version) {
         value = withContext(Dispatchers.IO) { Repository.pending() }
+    }
+    val holdings by produceState(emptyList<Holding>(), version) {
+        value = withContext(Dispatchers.IO) { Repository.holdings() }
     }
     val list = pending ?: return
     val listState = rememberLazyListState()
@@ -226,13 +267,15 @@ fun ReviewScreen(focusId: Long?, onFocusHandled: () -> Unit, version: Int) {
                 )
             }
         }
-        items(list, key = { it.id }) { txn -> ReviewCard(txn, highlighted = txn.id == focusId) }
+        items(list, key = { it.id }) { txn -> ReviewCard(txn, highlighted = txn.id == focusId, holdings = holdings) }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ReviewCard(txn: Txn, highlighted: Boolean) {
+private fun ReviewCard(txn: Txn, highlighted: Boolean, holdings: List<Holding>) {
     var selected by remember(txn.id) { mutableStateOf(txn.suggested) }
+    var holdingId by remember(txn.id) { mutableStateOf<Long?>(null) }
     var note by remember(txn.id) { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -268,12 +311,28 @@ private fun ReviewCard(txn: Txn, highlighted: Boolean) {
                 modifier = Modifier.fillMaxWidth(),
             )
             CategoryChips(selected) { selected = it }
+            if (selected == Category.INVESTMENT && holdings.isNotEmpty()) {
+                Text("Which investment? (optional)", style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    holdings.forEach { h ->
+                        FilterChip(
+                            selected = holdingId == h.id,
+                            onClick = { holdingId = if (holdingId == h.id) null else h.id },
+                            label = { Text("${h.kind.emoji} ${h.name}") },
+                        )
+                    }
+                }
+            }
             Button(
                 enabled = selected != null,
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     val c = selected ?: return@Button
-                    scope.launch(Dispatchers.IO) { Repository.confirm(txn.id, c, note) }
+                    val h = holdingId.takeIf { c == Category.INVESTMENT }
+                    scope.launch(Dispatchers.IO) {
+                        Repository.confirm(txn.id, c, note)
+                        if (h != null) Repository.setTxnHolding(txn.id, h)
+                    }
                     Notifier.cancel(context, txn.id)
                 },
             ) { Text("Save") }

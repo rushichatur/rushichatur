@@ -9,10 +9,14 @@ Kharcha picks up your payments on its own and only asks you one thing: **what wa
 - It **remembers** your choice per shop, so the next Swiggy payment is pre-filled. You can switch on *Auto-file* to skip the question for shops you've sorted before.
 - Categories: Food, Online Orders, Groceries, Investment, EMI & Loans, Bills & Recharge, Travel & Fuel, Entertainment, Health, Shopping, Friends & Family, Other.
 - Monthly total and breakdown by category, history with filters, and manual entry for cash.
-- **Dues tab**: track money people owe you.
-  - 🤝 *Lent to people*: who you lent to and how much is still pending. When you pay a friend on GPay, tap **I lent this** in Review to move it here instead of counting it as spending.
-  - 💼 *Freelance projects*: project, client, total fee, advance, and each payment as it arrives. Shows what's still pending.
+- **Home**: this month's spending plus a summary of 💰 earned, 🙏 borrowed, 📈 invested and 🏦 left over.
+- **💰 Income tab**: add salary, freelance, interest, gifts or other earnings for each month, and see what's left after spending and investing. Money borrowed from family or friends is shown separately and isn't counted as earnings.
+- **🤝 Dues tab**: money owed both ways.
+  - *Lent*: who you lent to and how much is still pending. When you pay a friend on GPay, tap **I lent this** in Review to move it here instead of counting it as spending.
+  - *Freelance*: project, client, total fee, advance, and each payment as it arrives. Payments logged here also count as income.
+  - *Borrowed*: money you took from family or friends, with each repayment.
   - Log part-payments; an entry closes itself once fully paid.
+- **📈 Invest tab**: your mutual funds, stocks and others (FD, gold, PPF) with amount invested, current value and gain/loss, plus how much you invested this month. When you confirm a payment as Investment, you can pick which fund it went into. Values are updated by hand because the app works offline.
 - **Private**: the app has no internet permission, so your data stays on your phone.
 
 ## Install on your phone
