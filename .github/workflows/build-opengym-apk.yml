@@ -58,6 +58,15 @@ jobs:
           npm run build:mobile
           echo "APP_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
 
+      # Our APK is signed with a different key than the official one. With the same app id,
+      # phones that already have (or once had) the official openGym refuse it, often as
+      # "package appears to be invalid". A distinct id lets it install next to any other copy.
+      - name: Give the app its own id
+        working-directory: opengym/frontend/android
+        run: |
+          sed -i 's/applicationId "ch.duartesantos.opengym"/applicationId "ch.duartesantos.opengym.personal"/' app/build.gradle
+          grep -q 'applicationId "ch.duartesantos.opengym.personal"' app/build.gradle
+
       - name: Build the APK (Gradle)
         working-directory: opengym/frontend/android
         run: ./gradlew --no-daemon assembleSideloadRelease
@@ -115,7 +124,7 @@ jobs:
             --title "openGym $APP_VERSION (Android APK, build $GITHUB_RUN_NUMBER)" \
             --notes "Android APK of [openGym](https://github.com/DuarteSantos8/openGym) $OPENGYM_REF, built from the official source by this repo's workflow.
 
-          **Install:** open this page on your Android phone, tap \`openGym-$APP_VERSION.apk\`, and allow installs from your browser when Android asks.
+          **Install:** open this page on your Android phone, tap \`openGym-$APP_VERSION.apk\`, wait for the download to finish completely, then open it and allow installs from your browser when Android asks. App id: \`ch.duartesantos.opengym.personal\`, so it installs next to any other openGym.
 
           Signed with $SIGNED_WITH. openGym is AGPL-3.0; source: https://github.com/DuarteSantos8/openGym/tree/$OPENGYM_REF" \
             "openGym-$APP_VERSION.apk" "openGym-$APP_VERSION.apk.sha256"
