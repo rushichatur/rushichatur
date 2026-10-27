@@ -11,6 +11,9 @@ import com.rushichatur.kharcha.core.ParsedTxn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
 
 enum class Source { SMS, NOTIFICATION, MANUAL }
 enum class Status { PENDING, CONFIRMED, IGNORED }
@@ -105,7 +108,10 @@ sealed class InsertResult {
     data object Duplicate : InsertResult()
 }
 
-private class Db(context: Context) : SQLiteOpenHelper(context, "kharcha.db", null, 3) {
+private const val DB_NAME = "kharcha.db"
+private const val DB_VERSION = 3
+
+private class Db(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_VERSION) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             """CREATE TABLE txn(
@@ -197,13 +203,68 @@ private class Db(context: Context) : SQLiteOpenHelper(context, "kharcha.db", nul
 /** Single place that reads and writes expenses. Every write bumps [changes] so open screens refresh. */
 object Repository {
     private lateinit var db: Db
+    private lateinit var appContext: Context
     private val _changes = MutableStateFlow(0)
     val changes: StateFlow<Int> = _changes
 
     private const val DEDUPE_WINDOW_MS = 10 * 60 * 1000L
 
     fun init(context: Context) {
-        if (!::db.isInitialized) db = Db(context.applicationContext)
+        if (!::db.isInitialized) {
+            appContext = context.applicationContext
+            db = Db(appContext)
+        }
+    }
+
+    // ---- Backup & restore: the whole database as one file ----
+
+    /** Thrown when a chosen file isn't a Kharcha backup this version can read. */
+    class NotABackup(message: String) : Exception(message)
+
+    @Synchronized
+    fun backupTo(out: OutputStream) {
+        db.close() // writes everything into the single .db file; it reopens on next use
+        appContext.getDatabasePath(DB_NAME).inputStream().use { it.copyTo(out) }
+    }
+
+    /** Replaces all data on this phone with [input]. Old data is kept if the file is bad. */
+    @Synchronized
+    fun restoreFrom(input: InputStream) {
+        val dbFile = appContext.getDatabasePath(DB_NAME)
+        val incoming = File(dbFile.parentFile, "restore.tmp")
+        val previous = File(dbFile.parentFile, "kharcha-before-restore.db")
+        try {
+            input.use { i -> incoming.outputStream().use { o -> i.copyTo(o) } }
+            checkBackup(incoming)
+            db.close()
+            if (dbFile.exists()) dbFile.copyTo(previous, overwrite = true)
+            listOf("-wal", "-shm", "-journal").forEach { File(dbFile.path + it).delete() }
+            incoming.copyTo(dbFile, overwrite = true)
+            try {
+                db.writableDatabase // opens it and upgrades an older backup if needed
+            } catch (e: Exception) {
+                db.close()
+                if (previous.exists()) previous.copyTo(dbFile, overwrite = true)
+                throw NotABackup("That backup couldn't be opened.")
+            }
+        } finally {
+            incoming.delete()
+        }
+        bump()
+    }
+
+    private fun checkBackup(file: File) {
+        val header = ByteArray(16)
+        val read = file.inputStream().use { it.read(header) }
+        if (read != 16 || String(header, Charsets.US_ASCII) != "SQLite format 3\u0000") {
+            throw NotABackup("That file isn't a Kharcha backup.")
+        }
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { d ->
+            val hasTxn = d.rawQuery("SELECT 1 FROM sqlite_master WHERE type='table' AND name='txn'", null)
+                .use { it.moveToFirst() }
+            if (!hasTxn) throw NotABackup("That file isn't a Kharcha backup.")
+            if (d.version > DB_VERSION) throw NotABackup("That backup is from a newer Kharcha. Update the app first.")
+        }
     }
 
     private fun bump() = _changes.update { it + 1 }

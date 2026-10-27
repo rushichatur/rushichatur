@@ -17,6 +17,7 @@ Kharcha picks up your payments on its own and only asks you one thing: **what wa
   - *Borrowed*: money you took from family or friends, with each repayment.
   - Log part-payments; an entry closes itself once fully paid.
 - **📈 Invest tab**: your mutual funds, stocks and others (FD, gold, PPF) with amount invested, current value and gain/loss, plus how much you invested this month. When you confirm a payment as Investment, you can pick which fund it went into. Values are updated by hand because the app works offline.
+- **Backup**: Setup → *Save backup* writes all your data to one file (save it to Google Drive). *Restore* loads it back after reinstalling or on a new phone.
 - **Private**: the app has no internet permission, so your data stays on your phone.
 
 ## Install on your phone

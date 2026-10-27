@@ -76,6 +76,7 @@ import com.rushichatur.kharcha.ingest.Notifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalDate
 import java.time.YearMonth
 
 private val screenPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp)
@@ -482,6 +483,48 @@ fun SetupScreen(resumeTick: Int) {
         localTick++
     }
 
+    var backupStatus by remember { mutableStateOf<String?>(null) }
+    var restoreUri by remember { mutableStateOf<Uri?>(null) }
+    val saveBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        backupStatus = "Saving…"
+        scope.launch {
+            backupStatus = withContext(Dispatchers.IO) {
+                runCatching {
+                    val out = context.contentResolver.openOutputStream(uri) ?: error("Couldn't open that location")
+                    out.use { Repository.backupTo(it) }
+                }.fold({ "✅ Backup saved. Keep this file safe." }, { "Couldn't save the backup: ${it.message}" })
+            }
+        }
+    }
+    val pickBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> restoreUri = uri }
+
+    restoreUri?.let { uri ->
+        AlertDialog(
+            onDismissRequest = { restoreUri = null },
+            title = { Text("Restore this backup?") },
+            text = { Text("Everything currently in Kharcha on this phone will be replaced by the backup.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    restoreUri = null
+                    backupStatus = "Restoring…"
+                    scope.launch {
+                        backupStatus = withContext(Dispatchers.IO) {
+                            runCatching {
+                                val input = context.contentResolver.openInputStream(uri) ?: error("Couldn't open that file")
+                                Repository.restoreFrom(input)
+                            }.fold(
+                                { "✅ Backup restored." },
+                                { if (it is Repository.NotABackup) it.message else "Couldn't restore: ${it.message}" },
+                            )
+                        }
+                    }
+                }) { Text("Replace my data") }
+            },
+            dismissButton = { TextButton(onClick = { restoreUri = null }) { Text("Cancel") } },
+        )
+    }
+
     fun requestSmsAndAlerts() {
         val perms = mutableListOf(Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_SMS)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) perms += Manifest.permission.POST_NOTIFICATIONS
@@ -580,6 +623,21 @@ fun SetupScreen(resumeTick: Int) {
                 Settings.setAutoFileKnown(context, it)
             })
         }
+
+        HorizontalDivider()
+        Text("Backup", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Saves all your expenses, income, dues and investments to one file. Keep it in Google Drive " +
+                "(pick Drive in the save screen) so you can restore it after reinstalling or on a new phone. " +
+                "The file includes your bank SMS text, so keep it private.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { saveBackup.launch("Kharcha-backup-${LocalDate.now()}.db") }) { Text("💾 Save backup") }
+            OutlinedButton(onClick = { pickBackup.launch(arrayOf("*/*")) }) { Text("Restore") }
+        }
+        backupStatus?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
 
         HorizontalDivider()
         Text(
