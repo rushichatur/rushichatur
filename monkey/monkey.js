@@ -52,7 +52,7 @@ const MONKEY_HEIGHT = 3.6;
 let headBone = null, spineBone = null;
 let headRestWorld = null, spineRestWorld = null;
 
-new GLTFLoader().load(MODEL_URL, gltf => {
+function onModel(gltf) {
   const model = gltf.scene;
 
   // The model faces -Z after export; turn it to face the camera (+Z)
@@ -90,10 +90,21 @@ new GLTFLoader().load(MODEL_URL, gltf => {
   if (spineBone) spineRestWorld = spineBone.getWorldQuaternion(new THREE.Quaternion());
 
   document.body.classList.add('loaded');
-}, undefined, err => {
+}
+
+function onModelError(err) {
   console.error('Could not load the monkey model', err);
   document.getElementById('status').textContent = 'Could not load the monkey model.';
-});
+}
+
+const loader = new GLTFLoader();
+if (window.MONKEY_B64) {
+  // Model embedded in the page as base64 (used by the single-file preview)
+  const bytes = Uint8Array.from(atob(window.MONKEY_B64), c => c.charCodeAt(0));
+  loader.parse(bytes.buffer, '', onModel, onModelError);
+} else {
+  loader.load(MODEL_URL, onModel, undefined, onModelError);
+}
 
 // ---------- Banana cursor ----------
 const banana = document.getElementById('banana');
