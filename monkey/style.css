@@ -26,7 +26,7 @@ html, body {
   position: fixed; right: 24px; bottom: 24px; z-index: 2;
   padding: 10px 16px; border: 0; border-radius: 999px;
   background: #1c1b1b; color: #f1ead9; font: inherit; font-size: 14px;
-  cursor: none;
+  cursor: none; text-decoration: none;
 }
 .export:hover { background: #333; }
 
@@ -48,3 +48,5 @@ html, body {
 @media (hover: none) {
   html, body, .export { cursor: auto; }
 }
+
+.status { position: fixed; left: 0; right: 0; top: 50%; z-index: 2; text-align: center; color: #f1ead9; }

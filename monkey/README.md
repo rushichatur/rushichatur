@@ -1,6 +1,6 @@
-# Zen Monkey
+# Wink Monkey
 
-A 3D monkey built entirely in code with Three.js. Its head follows a banana cursor.
+A rigged 3D monkey (from `winkmonkey.blend`) shown with Three.js. Its head bone turns to follow a banana cursor.
 
 ## Run it
 Open it through any local web server (opening the file directly won't load the 3D modules):
@@ -13,6 +13,7 @@ Then visit http://localhost:8000
 ## Files
 - `index.html` – page and banana cursor
 - `style.css` – split dark/light background
-- `monkey.js` – builds the monkey (head, face, headphones, body, arms, crossed legs, tail) and handles head-follow
+- `monkey.js` – loads `winkmonkey.glb` and turns the `head` bone (and a little of `spine_3`) toward the banana
+- `winkmonkey.glb` – the monkey and its skeleton, exported from the Blender file
 
-The **Download 3D model (.glb)** button exports the monkey so you can open it in Blender, Spline, etc.
+To update the model: re-export from Blender with File → Export → glTF 2.0 (.glb), selecting only the monkey mesh and its armature, and save over `winkmonkey.glb`.
