@@ -1,0 +1,13 @@
+schema_version = "1.0.0"
+
+id = "beam_fx"
+version = "1.0.0"
+name = "Beam FX"
+tagline = "Animated reveal, scan and hologram effects for any object"
+maintainer = "rushichatur"
+type = "add-on"
+
+blender_version_min = "4.2.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
+tags = ["Animation", "Material", "3D View"]
