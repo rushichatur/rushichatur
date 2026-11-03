@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f6feb">
+<meta name="description" content="Lightweight, ad-free, offline editor for Word (.docx) and Excel (.xlsx) files.">
+<title>Lite Office</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- ============ HOME ============ -->
+<section id="home" class="view">
+  <header class="home-head">
+    <img src="icons/icon.svg" alt="" width="36" height="36">
+    <h1>Lite Office</h1>
+    <span class="tag">No ads · Works offline</span>
+  </header>
+
+  <div class="home-actions">
+    <button class="big-btn" id="btn-open">
+      <span class="ico">📂</span><span>Open file</span>
+      <small>.docx .xlsx .xls .csv .ods .txt</small>
+    </button>
+    <button class="big-btn doc" id="btn-new-doc">
+      <span class="ico">📝</span><span>New document</span><small>Word</small>
+    </button>
+    <button class="big-btn sheet" id="btn-new-sheet">
+      <span class="ico">📊</span><span>New spreadsheet</span><small>Excel</small>
+    </button>
+  </div>
+
+  <div class="recent-head">
+    <h2>Recent</h2>
+    <button class="link" id="btn-clear-recent">Clear</button>
+  </div>
+  <ul id="recent-list" class="recent-list"></ul>
+  <p id="recent-empty" class="muted">Files you open or save will appear here.</p>
+
+  <p id="install-hint" class="muted small" hidden>
+    Tip: tap <b>Install</b> to add Lite Office to your home screen.
+    <button id="btn-install" class="pill">Install</button>
+  </p>
+  <input type="file" id="file-input" accept=".docx,.xlsx,.xlsm,.xls,.csv,.ods,.txt,.html,.htm" hidden>
+</section>
+
+<!-- ============ DOCUMENT EDITOR ============ -->
+<section id="doc-view" class="view" hidden>
+  <header class="topbar">
+    <button class="icon-btn" data-action="home" title="Back">←</button>
+    <input class="title-input" id="doc-title" value="Document" aria-label="File name">
+    <button class="icon-btn" id="doc-save" title="Save (.docx)">💾</button>
+    <button class="icon-btn" id="doc-more" title="More">⋮</button>
+  </header>
+  <div class="menu" id="doc-menu" hidden>
+    <button data-cmd="save-docx">Save as Word (.docx)</button>
+    <button data-cmd="save-pdf">Print / Save as PDF</button>
+    <button data-cmd="save-html">Save as web page (.html)</button>
+    <button data-cmd="save-txt">Save as plain text (.txt)</button>
+    <button data-cmd="share">Share…</button>
+    <hr>
+    <button data-cmd="find">Find &amp; replace</button>
+    <button data-cmd="count">Word count</button>
+  </div>
+  <div class="toolbar" id="doc-toolbar">
+    <button data-exec="undo" title="Undo">↶</button>
+    <button data-exec="redo" title="Redo">↷</button>
+    <select id="doc-block" title="Paragraph style">
+      <option value="p">Normal</option>
+      <option value="h1">Heading 1</option>
+      <option value="h2">Heading 2</option>
+      <option value="h3">Heading 3</option>
+      <option value="blockquote">Quote</option>
+    </select>
+    <select id="doc-size" title="Font size">
+      <option value="">Size</option>
+      <option value="1">8</option><option value="2">10</option><option value="3">12</option>
+      <option value="4">14</option><option value="5">18</option><option value="6">24</option><option value="7">36</option>
+    </select>
+    <button data-exec="bold" title="Bold"><b>B</b></button>
+    <button data-exec="italic" title="Italic"><i>I</i></button>
+    <button data-exec="underline" title="Underline"><u>U</u></button>
+    <button data-exec="strikeThrough" title="Strikethrough"><s>S</s></button>
+    <label class="color-btn" title="Text colour">A<input type="color" id="doc-color" value="#d1242f"></label>
+    <label class="color-btn hl" title="Highlight">🖍<input type="color" id="doc-hilite" value="#fff36b"></label>
+    <button data-exec="justifyLeft" title="Align left">⯇</button>
+    <button data-exec="justifyCenter" title="Center">≡</button>
+    <button data-exec="justifyRight" title="Align right">⯈</button>
+    <button data-exec="justifyFull" title="Justify">☰</button>
+    <button data-exec="insertUnorderedList" title="Bullets">•</button>
+    <button data-exec="insertOrderedList" title="Numbering">1.</button>
+    <button data-exec="outdent" title="Decrease indent">⇤</button>
+    <button data-exec="indent" title="Increase indent">⇥</button>
+    <button id="doc-table" title="Insert table">▦</button>
+    <button id="doc-image" title="Insert picture">🖼</button>
+    <button id="doc-link" title="Insert link">🔗</button>
+    <button id="doc-pagebreak" title="Page break">⤓</button>
+    <button data-exec="removeFormat" title="Clear formatting">⌫</button>
+    <input type="file" id="doc-image-input" accept="image/*" hidden>
+  </div>
+  <div class="findbar" id="doc-find" hidden>
+    <input id="find-text" placeholder="Find">
+    <input id="replace-text" placeholder="Replace with">
+    <button id="find-next">Next</button>
+    <button id="replace-one">Replace</button>
+    <button id="replace-all">All</button>
+    <button id="find-close" class="icon-btn">✕</button>
+  </div>
+  <div class="doc-scroll" id="doc-scroll">
+    <article id="doc-page" class="page" contenteditable="true" spellcheck="true"></article>
+  </div>
+  <footer class="statusbar" id="doc-status">0 words</footer>
+</section>
+
+<!-- ============ SPREADSHEET EDITOR ============ -->
+<section id="sheet-view" class="view" hidden>
+  <header class="topbar">
+    <button class="icon-btn" data-action="home" title="Back">←</button>
+    <input class="title-input" id="sheet-title" value="Spreadsheet" aria-label="File name">
+    <button class="icon-btn" id="sheet-save" title="Save">💾</button>
+    <button class="icon-btn" id="sheet-more" title="More">⋮</button>
+  </header>
+  <div class="menu" id="sheet-menu" hidden>
+    <button data-cmd="save-xlsx">Save as Excel (.xlsx)</button>
+    <button data-cmd="save-csv">Save sheet as CSV</button>
+    <button data-cmd="save-ods">Save as OpenDocument (.ods)</button>
+    <button data-cmd="save-pdf">Print / Save as PDF</button>
+    <button data-cmd="share">Share…</button>
+    <hr>
+    <button data-cmd="find">Find</button>
+    <button data-cmd="sort-asc">Sort A → Z (by selected column)</button>
+    <button data-cmd="sort-desc">Sort Z → A (by selected column)</button>
+    <button data-cmd="merge">Merge / unmerge cells</button>
+    <button data-cmd="help">Formula help</button>
+  </div>
+  <div class="toolbar" id="sheet-toolbar">
+    <button data-sc="undo" title="Undo">↶</button>
+    <button data-sc="redo" title="Redo">↷</button>
+    <button data-sc="bold" title="Bold"><b>B</b></button>
+    <button data-sc="italic" title="Italic"><i>I</i></button>
+    <button data-sc="underline" title="Underline"><u>U</u></button>
+    <label class="color-btn" title="Text colour">A<input type="color" id="sheet-color" value="#d1242f"></label>
+    <label class="color-btn hl" title="Fill colour">🪣<input type="color" id="sheet-fill" value="#fff36b"></label>
+    <button data-sc="nofill" title="Clear fill / colour">⌀</button>
+    <button data-sc="left" title="Align left">⯇</button>
+    <button data-sc="center" title="Center">≡</button>
+    <button data-sc="right" title="Align right">⯈</button>
+    <select id="sheet-fmt" title="Number format">
+      <option value="General">General</option>
+      <option value="0">0</option>
+      <option value="0.00">0.00</option>
+      <option value="#,##0.00">1,234.56</option>
+      <option value="&quot;₹&quot;#,##0.00">₹ Currency</option>
+      <option value="&quot;$&quot;#,##0.00">$ Currency</option>
+      <option value="0%">Percent</option>
+      <option value="0.00%">Percent 0.00</option>
+      <option value="dd-mm-yyyy">Date dd-mm-yyyy</option>
+      <option value="yyyy-mm-dd">Date yyyy-mm-dd</option>
+      <option value="@">Text</option>
+    </select>
+    <button data-sc="sum" title="AutoSum">Σ</button>
+    <button data-sc="copy" title="Copy">⧉</button>
+    <button data-sc="paste" title="Paste">📋</button>
+    <button data-sc="row-add" title="Insert row above">+Row</button>
+    <button data-sc="col-add" title="Insert column left">+Col</button>
+    <button data-sc="row-del" title="Delete row">−Row</button>
+    <button data-sc="col-del" title="Delete column">−Col</button>
+  </div>
+  <div class="formula-bar">
+    <span id="cell-name" class="cell-name">A1</span>
+    <span class="fx">fx</span>
+    <input id="formula-input" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done">
+  </div>
+  <div class="findbar" id="sheet-find" hidden>
+    <input id="sfind-text" placeholder="Find in sheet">
+    <button id="sfind-next">Next</button>
+    <button id="sfind-close" class="icon-btn">✕</button>
+  </div>
+  <div class="grid-wrap" id="grid-wrap">
+    <table class="grid" id="grid"></table>
+    <input id="cell-editor" class="cell-editor" hidden autocomplete="off" autocapitalize="off" spellcheck="false">
+  </div>
+  <footer class="sheet-tabs">
+    <div id="tabs" class="tabs"></div>
+    <button class="icon-btn" id="tab-add" title="Add sheet">＋</button>
+    <span id="sheet-status" class="sheet-status"></span>
+  </footer>
+</section>
+
+<div id="toast" class="toast" hidden></div>
+<dialog id="dialog"><form method="dialog" id="dialog-form"></form></dialog>
+
+<script src="vendor/jszip.min.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="vendor/mammoth.browser.min.js"></script>
+<script src="js/util.js"></script>
+<script src="js/docx-reader.js"></script>
+<script src="js/docx-writer.js"></script>
+<script src="js/doc-editor.js"></script>
+<script src="js/formula.js"></script>
+<script src="js/xlsx-io.js"></script>
+<script src="js/sheet-editor.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
