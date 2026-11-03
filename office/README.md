@@ -31,7 +31,23 @@ Your files never leave your device: there is no server, no account, no tracking 
 - Works with no internet after the first visit
 - Dark mode follows your phone or PC setting
 
-## Using it on your phone
+## Android app (APK)
+
+Download [`android/LiteOffice.apk`](../android/LiteOffice.apk) on your phone and open it to install
+(Android 5.0 or newer). The first time, Android asks you to allow installing apps from your browser or file manager.
+
+The APK has no internet permission at all, so it cannot show ads or send your files anywhere.
+Extra features in the APK:
+- **Open with Lite Office** from your file manager, WhatsApp, Gmail, Drive, etc.
+- **Save** lets you pick the folder and file name
+- **Share** sends the file to any app
+- **Print / Save as PDF** uses Android's printing
+
+To rebuild it on Ubuntu/Debian: `sudo apt-get install aapt apksigner dalvik-exchange android-sdk-platform-23 zipalign default-jdk`,
+then run `android/build.sh`. The signing key (`android/liteoffice.keystore`) is created on the first build and is not stored in git.
+An APK signed with a different key can't install over the old one, so uninstall the old app first (your recent-files list resets).
+
+## Using it in a phone browser instead
 
 1. Open the app's web address in Chrome (see "Publishing" below).
 2. Tap **Install** on the home screen of the app, or Chrome menu ⋮ → **Add to Home screen**.

@@ -146,8 +146,23 @@
     $('#install-hint').hidden = true;
   });
 
-  // Offline support
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  // Hooks used by the Android app (android/ folder)
+  window.liteOfficeOpen = (base64, name) => {
+    const bin = atob(base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    openFile(new File([bytes], name));
+  };
+  window.liteOfficePersist = () => {
+    if (!$('#doc-view').hidden) DocEditor.persist();
+    if (!$('#sheet-view').hidden) SheetEditor.persist();
+  };
+  if (window.Android) {
+    window.print = () => window.Android.print(document.querySelector('.view:not([hidden]) .title-input')?.value || 'Lite Office');
+  }
+
+  // Offline support (the Android app already has every file built in)
+  if (!window.Android && 'serviceWorker' in navigator && location.protocol !== 'file:') {
     navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW registration failed', err));
   }
 

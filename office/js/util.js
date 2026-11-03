@@ -79,8 +79,23 @@ const Util = (() => {
 
   /* Save a Blob: use the native "Save as" picker where it exists (desktop Chrome/Edge),
      otherwise trigger a normal download (phones put it in Downloads). */
+  // Inside the Android app, files go through the native bridge (see android/ folder).
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(',')[1] || '');
+      r.onerror = () => reject(r.error);
+      r.readAsDataURL(blob);
+    });
+  }
+  const android = window.Android;
+
   async function saveBlob(blob, filename) {
     const ext = extOf(filename);
+    if (android) {
+      android.saveFile(await blobToBase64(blob), filename, MIME[ext] || blob.type || 'application/octet-stream');
+      return true;
+    }
     if (window.showSaveFilePicker) {
       try {
         const handle = await window.showSaveFilePicker({
@@ -110,6 +125,10 @@ const Util = (() => {
   }
 
   async function shareBlob(blob, filename) {
+    if (android) {
+      android.shareFile(await blobToBase64(blob), filename, MIME[extOf(filename)] || blob.type || 'application/octet-stream');
+      return;
+    }
     const file = new File([blob], filename, { type: blob.type });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try { await navigator.share({ files: [file], title: filename }); }
